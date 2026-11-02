@@ -1,0 +1,422 @@
+[
+    {
+        "id": "5773aea23d2d7d7b",
+        "at": "2026-10-04T11:24:00+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save",
+        "entity": "store",
+        "entityId": "",
+        "details": "Updated HR data"
+    },
+    {
+        "id": "1c7e2273b834ad9d",
+        "at": "2026-10-04T11:24:15+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "a469f2fadf0015ed",
+        "at": "2026-10-04T11:24:31+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "3d85fb18c268c0bd",
+        "at": "2026-10-04T11:25:03+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "1784f6edcf0191c3",
+        "at": "2026-10-04T11:25:33+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "e326677a0a64d285",
+        "at": "2026-10-04T11:25:49+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "5aa13ae43885e7f5",
+        "at": "2026-10-04T11:26:02+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "b4412dc42bb92f13",
+        "at": "2026-10-04T11:29:24+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=HR · 4 user(s)"
+    },
+    {
+        "id": "3baeef28e457b869",
+        "at": "2026-10-04T16:30:49+02:00",
+        "user": "jmmendoza@gmail.com",
+        "role": "HR Staff",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "18abe15699505043",
+        "at": "2026-10-04T16:34:01+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "568d337c98f009cd",
+        "at": "2026-10-04T16:34:50+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "f66e8108cc24c22e",
+        "at": "2026-10-04T16:34:58+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "4e2e8c6176294da1",
+        "at": "2026-10-04T16:37:19+02:00",
+        "user": "financestaff1@gmail.com",
+        "role": "Finance Staff",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "03dbd64eb2f77975",
+        "at": "2026-10-04T16:48:11+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "8643b47e1f7ccd0e",
+        "at": "2026-10-04T16:48:16+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "954c5a3a121dedb5",
+        "at": "2026-10-04T16:48:34+02:00",
+        "user": "financestaff1@gmail.com",
+        "role": "Finance Staff",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "e7806f779b67a545",
+        "at": "2026-10-04T16:50:16+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "f028cccfda726f42",
+        "at": "2026-10-04T16:50:33+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "f65f713ccc0f3d61",
+        "at": "2026-10-04T16:50:42+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "4be2ec54c660c8f5",
+        "at": "2026-10-04T16:54:28+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "5e97667fa6723d5d",
+        "at": "2026-10-04T16:54:46+02:00",
+        "user": "financestaff1@gmail.com",
+        "role": "Finance Staff",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "53c6bafda4cfe258",
+        "at": "2026-10-04T16:55:12+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "e9e8134d85723326",
+        "at": "2026-10-04T16:57:13+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=HR · 4 user(s)"
+    },
+    {
+        "id": "d5da5310ca13db9c",
+        "at": "2026-10-04T16:57:35+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=HR · 4 user(s)"
+    },
+    {
+        "id": "635352e744af4fb1",
+        "at": "2026-10-04T16:57:47+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=HR · 4 user(s)"
+    },
+    {
+        "id": "74236772b0273829",
+        "at": "2026-10-04T17:00:59+02:00",
+        "user": "jmmendoza@gmail.com",
+        "role": "HR Staff",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "9f6c63cfad072a41",
+        "at": "2026-10-04T17:01:42+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Admin · Department=HR · 1 user(s)"
+    },
+    {
+        "id": "ad66bd9adeea92a2",
+        "at": "2026-10-04T17:02:05+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "86fe3558963ec89b",
+        "at": "2026-10-04T17:02:10+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Admin · Department=HR · 1 user(s)"
+    },
+    {
+        "id": "90511cad837a963a",
+        "at": "2026-10-04T17:02:17+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "f6d30fc0074e75b3",
+        "at": "2026-10-04T17:03:20+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "9e97660b2f37ad52",
+        "at": "2026-10-04T17:03:26+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "008fc8fecc5c1083",
+        "at": "2026-10-04T17:03:29+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "f42d79146d81f29d",
+        "at": "2026-10-04T17:03:36+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Admin · Department=HR · 1 user(s)"
+    },
+    {
+        "id": "c07375f84d7d8783",
+        "at": "2026-10-04T17:03:43+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=Staff · Department=Finance · 4 user(s)"
+    },
+    {
+        "id": "637033470352402a",
+        "at": "2026-10-04T17:04:20+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "83363838c8c86217",
+        "at": "2026-10-04T17:04:24+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "df1d23e5bc29d7f4",
+        "at": "2026-10-04T17:05:22+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "1e402b295a38ddd9",
+        "at": "2026-10-04T17:05:29+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save_access_bulk",
+        "entity": "account",
+        "entityId": "",
+        "details": "Position=All · Department=All · 12 user(s)"
+    },
+    {
+        "id": "9142cdebb0c659f6",
+        "at": "2026-10-04T17:11:49+02:00",
+        "user": "jmmendoza@gmail.com",
+        "role": "HR Staff",
+        "action": "logout",
+        "entity": "",
+        "entityId": "",
+        "details": ""
+    },
+    {
+        "id": "08462ee3ff68ffe5",
+        "at": "2026-10-04T17:42:38+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save",
+        "entity": "store",
+        "entityId": "",
+        "details": "Updated HR data"
+    },
+    {
+        "id": "3f60c238a618b513",
+        "at": "2026-10-04T17:42:45+02:00",
+        "user": "admin26@gmail.com",
+        "role": "HR Admin",
+        "action": "save",
+        "entity": "store",
+        "entityId": "",
+        "details": "Updated HR data"
+    }
+]

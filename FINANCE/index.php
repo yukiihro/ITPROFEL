@@ -1,6 +1,17 @@
 <?php
 declare(strict_types=1);
-session_start();
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => false,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
 
 $dept = $_SESSION['user']['department'] ?? '';
 if (!isset($_SESSION['user']) || $dept === '') {
@@ -8,11 +19,21 @@ if (!isset($_SESSION['user']) || $dept === '') {
     exit;
 }
 if (strcasecmp($dept, 'Finance') !== 0) {
-    header('Location: ../HR/');
+    if (strcasecmp($dept, 'HR') === 0) {
+        header('Location: ../HR/');
+    } elseif (strcasecmp($dept, 'Procurement') === 0) {
+        header('Location: ../PROCUREMENT/supplier/supplier.html');
+    } else {
+        header('Location: ../index.php');
+    }
     exit;
 }
+
+// SUCCESS: We are on the Finance portal. Reset the redirect guard.
+$_SESSION['redirect_guard'] = 0;
+unset($_SESSION['redirect_guard']);
 ?>
-<!DOCTYPE html>
+<?php session_write_close(); ?><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -21,7 +42,7 @@ if (strcasecmp($dept, 'Finance') !== 0) {
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>D.E.V.S · Finance Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=20261014v12">
+    <link rel="stylesheet" href="style.css?v=20261106devs2">
 </head>
 <body>
 
@@ -29,10 +50,10 @@ if (strcasecmp($dept, 'Finance') !== 0) {
         <aside class="sidebar">
             <a href="#" class="brand" id="brandHome" title="Go to Dashboard" aria-label="Go to Dashboard">
                 <div class="brand-mark">
-                    <img src="assets/logo.png" alt="HRFin logo" width="48" height="48" />
+                    <img src="assets/logo.png" alt="DEVS logo" width="48" height="48" />
                 </div>
                 <div class="brand-text">
-                    <span class="brand-name"><span class="brand-hr">HR</span><span class="brand-fin">Fin</span></span>
+                    <img class="brand-devs-img" src="assets/icon-devs.png" alt="DEVS" />
                 </div>
             </a>
 
@@ -82,7 +103,7 @@ if (strcasecmp($dept, 'Finance') !== 0) {
             <header class="topbar">
                 <div class="topbar-left">
                     <span class="topbar-icon-badge" aria-hidden="true">
-                        <img src="assets/logo.png" alt="HRFin logo" />
+                        <img src="assets/logo.png" alt="DEVS logo" />
                     </span> 
                     <div class="topbar-context">
                         <span>Financial Management</span>
@@ -90,19 +111,41 @@ if (strcasecmp($dept, 'Finance') !== 0) {
                     </div>
                 </div>
                 <div class="topbar-right">
-                    <button type="button" class="topbar-bell" id="topbarBell" aria-label="Notifications">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                    </button>
-                    <div class="topbar-user">
+                    <div class="notification-wrapper" style="position: relative;">
+                        <button type="button" class="topbar-bell" id="topbarBell" aria-label="Notifications">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                            </svg>
+                            <span class="notification-dot" id="notifDot" style="display: none;"></span>
+                        </button>
+                        
+                        <!-- NOTIFICATION PANEL -->
+                        <div class="notif-popover" id="notifPopover">
+                            <div class="notif-header">
+                                <div class="notif-title-row">
+                                    <button class="notif-close" id="notifCloseBtn">✕</button>
+                                    <h3>Notifications</h3>
+                                    <span class="notif-badge">Up to date</span>
+                                    <span class="notif-mark-read" id="notifMarkRead">Mark all read</span>
+                                </div>
+                                <div class="notif-tabs">
+                                    <button class="active" data-tab="all" id="tabAll">All (0)</button>
+                                    <button data-tab="unread" id="tabUnread">Unread (0)</button>
+                                    <button data-tab="alerts" id="tabAlerts">Alerts (0)</button>
+                                </div>
+                            </div>
+                            <div class="notif-body" id="notifBody"></div>
+                            <div class="notif-footer">View all notifications →</div>
+                        </div>
+                    </div>
+                    <button type="button" class="topbar-user" id="topbarProfileBtn" style="background: transparent; border: none; cursor: pointer; padding: 0; text-align: inherit; font-family: inherit;" title="Account Settings">
                         <div class="topbar-user-text">
                             <strong id="topbarName">&nbsp;</strong>
                             <small id="topbarEmail">&nbsp;</small>
                         </div>
-                        <button type="button" class="avatar" id="userAvatar" title="Account settings">FA</button>
-                    </div>
+                        <div class="avatar" id="userAvatar">FA</div>
+                    </button>
                 </div>
             </header>
 
@@ -122,6 +165,6 @@ if (strcasecmp($dept, 'Finance') !== 0) {
 
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
-    <script src="functions.js?v=20261014i" defer></script>
+    <script src="functions.js?v=20261106txview1" defer></script>
 </body>
 </html>

@@ -1,0 +1,31 @@
+PRODUCTION ↔ INVENTORY WORKFLOW (BUILD 44 INTEGRATION)
+
+Expected behavior
+1. Inventory Request Sheet is for Raw Material requests used by Production Material Issuance.
+2. Approving an Inventory Finished Good product request creates the Production order only. It does NOT mark anything delivered.
+3. Production continues Material Issuance and production/quality steps.
+4. When Finished Goods are completed, the Production user sends the finished goods from the Finished Goods page.
+5. Production then reports the actual shipped quantity to Inventory through the Inventory API. Inventory Delivery Progress changes to Out for Delivery when the full approved quantity has been reported (or Partially Delivered for a partial shipment).
+6. Inventory Admin opens Delivery Progress and uses Confirm Receipt. That saves the receipt inspection and receipt_confirmed_at marker; the status becomes Delivered.
+
+Important setup
+- Keep the Production and Inventory databases separate; the integration uses the Inventory API.
+- Configure Production php/config.local.php with inventory_api_url and inventory_api_key.
+- Configure the Inventory host's IMS_API_KEY environment variable to exactly the same key.
+- In an existing Inventory database, import receipt_confirmation_migration.sql once using phpMyAdmin. It is safe to run more than once.
+- For a fresh database, inventory_system.sql now creates deliveries.receipt_confirmed_at automatically.
+- Both systems must be hosted/reachable at the configured URL. If Production and Inventory are on different computers, use the Inventory host's LAN URL instead of localhost.
+- The API request uses X-API-Team: Production and the Inventory API key.
+
+Important distinction
+- Material Issuance is for raw materials sent from Inventory to Production.
+- Delivery Progress is for finished goods requested by Inventory and completed by Production.
+- Confirming receipt is an Inventory action. Production cannot automatically mark its own shipment as Delivered.
+
+Testing checklist
+1. Create an Inventory request for a Finished Good destined for Production.
+2. Approve it in Production's Product Requests. Confirm Inventory Delivery Progress still says To Ship.
+3. Complete the linked Production order and record the item in Finished Goods.
+4. Send it from Production Finished Goods. Confirm Inventory Delivery Progress changes to Out for Delivery.
+5. In Inventory, confirm receipt. Confirm status changes to Delivered and a Delivery Receipt is created.
+6. Separately submit a Raw Material request from Production. It should appear in Inventory Request Sheet and be handled through Material Issuance, not Finished Goods Delivery Progress.

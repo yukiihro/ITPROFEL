@@ -1,0 +1,366 @@
+{
+    "employees": [
+        {
+            "id": "EMP-001",
+            "name": "Juan Miguel Mendoza",
+            "role": "HR Manager",
+            "position": "Staff",
+            "dept": "HR",
+            "email": "juan.mendoza@devs.com",
+            "phone": "0917-100-0001",
+            "salary": 85000,
+            "status": "Active",
+            "joined": "2021-03-15"
+        },
+        {
+            "id": "EMP-002",
+            "name": "John Ronie Matienzo",
+            "role": "Software Engineer",
+            "position": "Staff",
+            "dept": "Finance",
+            "email": "john.matienzo@devs.com",
+            "phone": "0917-100-0002",
+            "salary": 62000,
+            "status": "Active",
+            "joined": "2022-06-01"
+        },
+        {
+            "id": "EMP-003",
+            "name": "Chenelle Mae Agustin",
+            "role": "Payroll Officer",
+            "position": "Staff",
+            "dept": "Finance",
+            "email": "chenelle.agustin@devs.com",
+            "phone": "0917-100-0003",
+            "salary": 48000,
+            "status": "Active",
+            "joined": "2021-09-20"
+        },
+        {
+            "id": "EMP-004",
+            "name": "Tricia Joellene Aguila",
+            "role": "Sales Associate",
+            "position": "Staff",
+            "dept": "HR",
+            "email": "tricia.aguila@devs.com",
+            "phone": "0917-100-0004",
+            "salary": 38000,
+            "status": "On Leave",
+            "joined": "2023-01-10"
+        },
+        {
+            "id": "EMP-005",
+            "name": "Lance Nueca",
+            "role": "Accountant",
+            "position": "Staff",
+            "dept": "Finance",
+            "email": "lance.nueca@devs.com",
+            "phone": "0917-100-0005",
+            "salary": 55000,
+            "status": "Active",
+            "joined": "2020-11-05"
+        },
+        {
+            "id": "EMP-006",
+            "name": "Mark Justin Marasigan",
+            "role": "Recruiter",
+            "position": "Staff",
+            "dept": "HR",
+            "email": "mark.marasigan@devs.com",
+            "phone": "0917-100-0006",
+            "salary": 42000,
+            "status": "Active",
+            "joined": "2022-02-18"
+        },
+        {
+            "id": "EMP-007",
+            "name": "Kim Elias Catibog",
+            "role": "HR Assistant",
+            "position": "Staff",
+            "dept": "Finance",
+            "email": "kim.catibog@devs.com",
+            "phone": "0917-100-0007",
+            "salary": 40000,
+            "status": "On Leave",
+            "joined": "2024-01-15"
+        },
+        {
+            "id": "EMP-008",
+            "name": "adadad",
+            "role": "HR Staff",
+            "position": "Staff",
+            "dept": "HR",
+            "email": "123@gmail.com",
+            "phone": "",
+            "salary": 0,
+            "status": "Active",
+            "joined": "2026-10-01"
+        }
+    ],
+    "attendance": [
+        {
+            "id": "ATT-001",
+            "empId": "EMP-001",
+            "employeeName": "Administrator",
+            "date": "2026-10-02",
+            "timeIn": "08:02",
+            "timeOut": "17:10",
+            "status": "Present"
+        },
+        {
+            "id": "ATT-002",
+            "empId": "EMP-002",
+            "date": "2026-10-02",
+            "timeIn": "08:15",
+            "timeOut": "17:02",
+            "status": "Present"
+        },
+        {
+            "id": "ATT-003",
+            "empId": "EMP-003",
+            "date": "2026-10-02",
+            "timeIn": "08:45",
+            "timeOut": "17:00",
+            "status": "Late"
+        },
+        {
+            "id": "ATT-004",
+            "empId": "EMP-004",
+            "date": "2026-10-02",
+            "timeIn": "",
+            "timeOut": "",
+            "status": "On Leave"
+        },
+        {
+            "id": "ATT-005",
+            "empId": "EMP-005",
+            "date": "2026-10-02",
+            "timeIn": "07:58",
+            "timeOut": "17:05",
+            "status": "Present"
+        },
+        {
+            "id": "ATT-006",
+            "empId": "EMP-006",
+            "date": "2026-10-02",
+            "timeIn": "08:10",
+            "timeOut": "17:00",
+            "status": "Present"
+        }
+    ],
+    "leaves": [
+        {
+            "id": "LV-1001",
+            "empId": "EMP-002",
+            "type": "Vacation Leave",
+            "from": "2026-10-02",
+            "to": "2026-10-02",
+            "reason": "Family trip",
+            "status": "Pending"
+        },
+        {
+            "id": "LV-1002",
+            "empId": "EMP-003",
+            "type": "Sick Leave",
+            "from": "2026-10-02",
+            "to": "2026-10-02",
+            "reason": "Fever",
+            "status": "Approved"
+        },
+        {
+            "id": "LV-1003",
+            "empId": "EMP-005",
+            "type": "Vacation Leave",
+            "from": "2026-10-02",
+            "to": "2026-10-02",
+            "reason": "Personal vacation",
+            "status": "Pending"
+        },
+        {
+            "id": "LV-1004",
+            "empId": "EMP-006",
+            "type": "Emergency Leave",
+            "from": "2026-10-02",
+            "to": "2026-10-02",
+            "reason": "Family emergency",
+            "status": "Rejected"
+        },
+        {
+            "id": "LV-1005",
+            "empId": "EMP-008",
+            "employeeName": "adadad",
+            "type": "Vacation Leave",
+            "from": "2026-10-14",
+            "to": "2026-10-15",
+            "reason": "asdads",
+            "proofName": "",
+            "proofData": "",
+            "status": "Rejected"
+        },
+        {
+            "id": "LV-1006",
+            "empId": "EMP-008",
+            "employeeName": "adadad",
+            "type": "Vacation Leave",
+            "from": "2026-10-07",
+            "to": "2026-10-15",
+            "reason": "No reason provided",
+            "proofName": "",
+            "proofData": "",
+            "status": "Rejected"
+        }
+    ],
+    "payroll": [],
+    "accounts": [
+        {
+            "code": "1000",
+            "name": "Cash on Hand",
+            "type": "Asset",
+            "balance": 185000
+        },
+        {
+            "code": "1010",
+            "name": "Bank Account - BDO",
+            "type": "Asset",
+            "balance": 1245000
+        },
+        {
+            "code": "1100",
+            "name": "Accounts Receivable",
+            "type": "Asset",
+            "balance": 386000
+        },
+        {
+            "code": "2000",
+            "name": "Accounts Payable",
+            "type": "Liability",
+            "balance": 214000
+        },
+        {
+            "code": "4000",
+            "name": "Service Revenue",
+            "type": "Revenue",
+            "balance": 1680000
+        },
+        {
+            "code": "5000",
+            "name": "Operating Expenses",
+            "type": "Expense",
+            "balance": 742000
+        }
+    ],
+    "receivables": [
+        {
+            "id": "AR-001",
+            "customer": "Northstar Digital",
+            "invoice": "INV-2026-041",
+            "due": "2026-09-20",
+            "amount": 185000,
+            "status": "Open"
+        },
+        {
+            "id": "AR-002",
+            "customer": "Cedar & Co.",
+            "invoice": "INV-2026-044",
+            "due": "2026-09-25",
+            "amount": 96000,
+            "status": "Open"
+        },
+        {
+            "id": "AR-003",
+            "customer": "Mabini Retail Group",
+            "invoice": "INV-2026-036",
+            "due": "2026-09-08",
+            "amount": 105000,
+            "status": "Overdue"
+        }
+    ],
+    "payables": [
+        {
+            "id": "AP-001",
+            "vendor": "Makati Properties",
+            "invoice": "BILL-2026-118",
+            "due": "2026-09-22",
+            "amount": 72000,
+            "status": "Approved"
+        },
+        {
+            "id": "AP-002",
+            "vendor": "Cloud Services PH",
+            "invoice": "BILL-2026-121",
+            "due": "2026-09-28",
+            "amount": 28500,
+            "status": "For review"
+        },
+        {
+            "id": "AP-003",
+            "vendor": "Metro Utilities",
+            "invoice": "BILL-2026-115",
+            "due": "2026-09-18",
+            "amount": 16400,
+            "status": "Due"
+        }
+    ],
+    "cashBank": [
+        {
+            "id": "CB-001",
+            "account": "BDO Operating",
+            "date": "2026-09-17",
+            "description": "Client retainer deposit",
+            "type": "Credit",
+            "amount": 185000,
+            "balance": 1245000
+        },
+        {
+            "id": "CB-002",
+            "account": "BDO Operating",
+            "date": "2026-09-16",
+            "description": "Office lease payment",
+            "type": "Debit",
+            "amount": 72000,
+            "balance": 1060000
+        },
+        {
+            "id": "CB-003",
+            "account": "Petty Cash",
+            "date": "2026-09-15",
+            "description": "Team supplies replenishment",
+            "type": "Debit",
+            "amount": 12500,
+            "balance": 185000
+        }
+    ],
+    "expenses": [
+        {
+            "id": "EXP-001",
+            "category": "Office lease",
+            "vendor": "Makati Properties",
+            "date": "2026-09-16",
+            "amount": 72000,
+            "status": "Posted"
+        },
+        {
+            "id": "EXP-002",
+            "category": "Software subscriptions",
+            "vendor": "Cloud Services PH",
+            "date": "2026-09-12",
+            "amount": 28500,
+            "status": "Approved"
+        },
+        {
+            "id": "EXP-003",
+            "category": "Travel and representation",
+            "vendor": "Various vendors",
+            "date": "2026-09-10",
+            "amount": 18400,
+            "status": "For review"
+        }
+    ],
+    "settings": {
+        "company": "D.E.V.S Management Inc.",
+        "currency": "PHP (₱)",
+        "cycle": "September 15–30, 2026",
+        "days": "5 days (Mon–Fri)"
+    },
+    "deductions": []
+}

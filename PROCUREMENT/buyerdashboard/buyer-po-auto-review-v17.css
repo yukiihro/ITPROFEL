@@ -1,0 +1,26 @@
+/* UniProcur PO v17 overlay: additive and isolated; no existing styles replaced. */
+.po-v17-dialog {position:fixed;inset:0;margin:auto;max-height:calc(100dvh - 32px);max-width:min(880px,calc(100vw - 32px));width:100%;padding:0;border:0;border-radius:14px;background:#fff;color:#171717;font-family:Inter,Arial,sans-serif;box-shadow:0 22px 75px rgba(0,0,0,.3)}
+.po-v17-dialog::backdrop{background:rgba(22,5,4,.6)}
+.po-v17-dialog-content{padding:20px 24px 24px;overflow:auto;max-height:calc(100dvh - 32px)}
+.po-v17-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;padding-bottom:13px;border-bottom:1px solid #ddd}
+.po-v17-head small{font-size:10px;color:#777;font-weight:600}
+.po-v17-head h2{margin:4px 0 0;font-size:21px}
+.po-v17-head button{border:0;background:#eee;border-radius:7px;font-size:22px;width:36px;height:36px;cursor:pointer}
+.po-v17-contents{padding-top:16px}
+.po-v17-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.po-v17-detail{display:flex;flex-direction:column;gap:5px;padding:12px;border:1px solid #e0e0e0;border-radius:8px;background:#fafafa;min-width:0;overflow-wrap:anywhere}
+.po-v17-detail span{font-size:11px;color:#6c6c6c}
+.po-v17-detail strong{font-size:13px;color:#171717;font-variant-numeric:tabular-nums}
+.po-v17-table-wrap{overflow-x:auto;margin:16px 0}
+.po-v17-table{width:100%;min-width:630px;border-collapse:collapse;font-size:12px}
+.po-v17-table th,.po-v17-table td{border-bottom:1px solid #ddd;padding:10px 9px;text-align:left}
+.po-v17-table th{background:#f6f6f6}
+.po-v17-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.po-v17-warning,.po-v17-error{padding:11px;border:1px solid #e9b6b6;border-radius:7px;background:#fff1f1;color:#8c1f1f;line-height:1.5;font-size:12px}
+.po-v17-muted{font-size:11px;color:#66717d;line-height:1.6}
+.po-v17-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px;border-top:1px solid #ddd;padding-top:15px;margin-top:16px;flex-wrap:wrap}
+.po-v17-footer a{text-decoration:none;border-radius:8px;padding:10px 13px;font-size:12px;font-weight:700}
+.po-v17-primary{color:#fff;background:#a91616}
+.po-v17-light{border:1px solid #bbb;background:#fff;color:#111}
+@media(max-width:620px){.po-v17-summary{grid-template-columns:1fr}.po-v17-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.po-v17-dialog-content{padding:16px}.po-v17-footer{align-items:stretch;flex-direction:column}.po-v17-footer a{text-align:center}}
+@media print{.po-v17-dialog{display:none!important}}

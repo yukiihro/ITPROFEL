@@ -1,0 +1,42 @@
+INVENTORY <-> PROCUREMENT WORKFLOW INTEGRATION
+
+What changed
+1. Procurement PR Manager approval sends a secure server-to-server event to Inventory.
+   The linked Inventory request changes from Pending to Approved.
+2. Procurement PO Manager approval sends the P.O. Number to Inventory.
+   Inventory saves the P.O. Number and changes Delivery Progress to Out for Delivery.
+3. Inventory's existing Confirm Receipt action saves the Delivery Receipt first, then notifies Procurement.
+   Procurement changes the linked Purchase Order status to received.
+4. Inventory Delivery Receipt already reads requests.po_number; it now receives the actual P.O. Number from Procurement before shipment confirmation.
+
+No database import is required for this integration update. Existing Inventory tables already contain
+requests.po_number, delivery status fields, and delivery_receipts.
+
+Apache/XAMPP configuration
+The same shared IMS_API_KEY must be available to both PHP applications. Keep it private; do not put it
+in JavaScript or HTML.
+
+The Procurement callback defaults to:
+http://127.0.0.1/ITPROFEL/INVENTORY/api/procurement-sync.php
+If your Inventory project URL is different, define this Apache environment variable:
+INVENTORY_SYNC_URL=http://127.0.0.1/YOUR-INVENTORY-PATH/api/procurement-sync.php
+
+Inventory's receipt callback defaults to:
+http://127.0.0.1/ITPROFEL/PROCUREMENT/database/inventory-receipt-confirmed.php
+If your Procurement project URL is different, define:
+PROCUREMENT_RECEIPT_SYNC_URL=http://127.0.0.1/YOUR-PROCUREMENT-PATH/database/inventory-receipt-confirmed.php
+
+Both applications must be reachable by the same Apache/XAMPP server and PHP cURL must be enabled.
+The callback endpoints use the shared API key and team header. Do not expose these endpoints without
+HTTPS and proper API-key protection when moving to public hosting.
+
+Workflow test
+1. Create an Inventory request with destination Procurement and submit/convert it in Procurement.
+2. Approve the linked Purchase Request as Procurement Manager. Verify Inventory Request Sheet shows Approved.
+3. Create the Purchase Order and have the Procurement Manager approve it. Verify Inventory Delivery Progress shows Out for Delivery and the P.O. Number is populated.
+4. In Inventory, record the actual received/inspected quantities and click Confirm Receipt.
+5. Verify Inventory creates the Delivery Receipt with the P.O. Number and Procurement Purchase Order status becomes Received.
+
+If the Procurement decision succeeds but its response contains inventory_synced=false, check the configured
+INVENTORY_SYNC_URL, shared IMS_API_KEY, Apache error log, and PHP cURL extension. Inventory receipt
+confirmation remains saved locally if the callback to Procurement fails; the message will warn about sync.

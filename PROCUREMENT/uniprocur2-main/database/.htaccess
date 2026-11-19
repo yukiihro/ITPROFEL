@@ -1,0 +1,5 @@
+# Separate Procurement PHP session from Inventory
+# Session name is set dynamically by uniprocur-session.php
+
+# Restrict Procurement session cookie to this app
+# Cookie path is set dynamically for /ITPROFEL/PROCUREMENT/

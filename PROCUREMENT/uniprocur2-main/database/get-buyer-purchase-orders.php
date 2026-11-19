@@ -1,0 +1,163 @@
+<?php
+/** GET lists Buyer's active Purchase Orders. GET ?po_number=... gives read-only PO with items. */
+require_once __DIR__ . '/buyer-po-common.php';
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    buyerPoJson(405, ['success' => false, 'message' => 'GET required.']);
+}
+try {
+    $buyer = buyerPoIdentity($conn);
+    $buyerId = (int) $buyer['id'];
+    $number = trim((string) ($_GET['po_number'] ?? ''));
+    if ($number !== '' && !preg_match('/\APO-[A-Za-z0-9-]{1,26}\z/', $number)) {
+        buyerPoJson(422, ['success' => false, 'message' => 'Invalid PO number.']);
+    }
+
+    // Use known supplier columns where available. Never pretend sample details came from MySQL.
+    $columns = [];
+    $columnResult = $conn->query('SHOW COLUMNS FROM suppliers');
+    while ($column = $columnResult->fetch_assoc()) $columns[$column['Field']] = true;
+    $field = static function(array $choices, string $alias) use ($columns): string {
+        foreach ($choices as $name) {
+            if (isset($columns[$name])) return "s.`{$name}` AS `{$alias}`";
+        }
+        return "NULL AS `{$alias}`";
+    };
+    $supplierFields = implode(', ', [
+        $field(['contact_person', 'contact_name', 'contact', 'representative'], 'supplier_contact'),
+        $field(['email', 'contact_email', 'supplier_email', 'email_address'], 'supplier_email'),
+        $field(['phone', 'contact_phone', 'mobile', 'phone_number'], 'supplier_phone'),
+        $field(['city', 'location', 'address'], 'supplier_location')
+    ]);
+    $sql = "SELECT po.id, po.po_number, po.rfq_id, po.rfq_quote_id, po.order_date, po.expected_delivery,
+                   po.delivery_address, po.notes_to_supplier, po.total_amount,
+                   LOWER(po.status) AS status,
+                   DATE_FORMAT(po.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+                   s.name AS supplier_name, s.payment_terms, {$supplierFields},
+                   r.rfq_number,
+                   COALESCE(po_lines.item_summary, '') AS item_summary,
+                   COALESCE(po_lines.item_count, 0) AS item_count,
+                   COALESCE(po_lines.qty_ordered, 0) AS qty_ordered,
+                   COALESCE(po_lines.qty_received, 0) AS qty_received,
+                   DATE_FORMAT(COALESCE(t.issued_at, po.created_at), '%Y-%m-%d %H:%i:%s') AS tracking_issued_at,
+                   DATE_FORMAT(t.confirmed_at, '%Y-%m-%d %H:%i:%s') AS tracking_confirmed_at,
+                   DATE_FORMAT(t.inventory_accepted_at, '%Y-%m-%d %H:%i:%s') AS tracking_inventory_accepted_at,
+                   COALESCE(t.accepted_source, '') AS tracking_accept_source,
+                   CASE WHEN t.confirmed_at IS NOT NULL THEN
+                     GREATEST(0, TIMESTAMPDIFF(SECOND, t.confirmed_at, NOW()))
+                   ELSE 0 END AS tracking_elapsed_seconds
+            FROM purchase_orders AS po
+            JOIN rfqs AS r ON r.id = po.rfq_id
+            JOIN purchase_requisitions AS pr ON pr.id = r.pr_id
+            JOIN suppliers AS s ON s.id = po.supplier_id
+            LEFT JOIN po_demo_tracking AS t ON t.po_id = po.id
+            LEFT JOIN (
+                SELECT pi.po_id, COUNT(*) AS item_count,
+                       GROUP_CONCAT(pi.item_name ORDER BY pi.id SEPARATOR ', ') AS item_summary,
+                       SUM(pi.qty_ordered) AS qty_ordered,
+                       SUM(COALESCE(pi.qty_received, 0)) AS qty_received
+                FROM po_items AS pi GROUP BY pi.po_id
+            ) AS po_lines ON po_lines.po_id = po.id
+            WHERE po.created_by = ? AND r.created_by = ? AND pr.created_by = ?
+              AND LOWER(po.status) NOT IN ('cancelled', 'canceled')";
+    if ($number !== '') {
+        $stmt = $conn->prepare($sql . ' AND po.po_number = ? LIMIT 1');
+        $stmt->bind_param('iiis', $buyerId, $buyerId, $buyerId, $number);
+        $stmt->execute();
+        $po = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$po) buyerPoJson(404, ['success' => false, 'message' => 'Purchase Order not found for this Buyer.']);
+        $id = (int) $po['id'];
+        $stmt = $conn->prepare('SELECT item_name, unit, qty_ordered, qty_received, unit_price, subtotal FROM po_items WHERE po_id = ? ORDER BY id');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        // UNIPROCUR_INVENTORY_TRACKING_API_V11 — read-only records, no fake milestones.
+        $po['tracking_inventory_request_number'] = null;
+        $po['tracking_inventory_sync_status'] = null;
+        $po['tracking_inventory_sync_delivered_at'] = null;
+        $po['tracking_inventory_delivery_status'] = null;
+        $po['tracking_verified_receipt_count'] = 0;
+        $po['tracking_latest_receipt_number'] = null;
+        $invReqNumber = '';
+        try {
+            $lk = $conn->prepare('SELECT l.inventory_request_number FROM inventory_request_pr_links l
+                JOIN rfqs r ON r.pr_id=l.pr_id WHERE r.id=? LIMIT 1');
+            $rfqId=(int)$po['rfq_id'];
+            $lk->bind_param('i',$rfqId);
+            $lk->execute();
+            $invReqNumber=(string)($lk->get_result()->fetch_assoc()['inventory_request_number']??'');
+            $lk->close();
+            if ($invReqNumber !== '') {
+                $po['tracking_inventory_request_number']=$invReqNumber;
+            }
+        } catch (Throwable $e) {
+            error_log('PO Inventory request link lookup: '.$e->getMessage());
+        }
+        // Source of truth for "Sent to Inventory" is the authenticated PO outbox.
+        try {
+            $sync=$conn->prepare("SELECT status,delivered_at FROM procurement_inventory_sync_outbox
+                WHERE event_type='po_approved' AND source_id=? LIMIT 1");
+            $sync->bind_param('i',$id);
+            $sync->execute();
+            $row=$sync->get_result()->fetch_assoc();
+            $sync->close();
+            if ($row) {
+                $po['tracking_inventory_sync_status']=(string)$row['status'];
+                $po['tracking_inventory_sync_delivered_at']=$row['delivered_at'];
+            }
+        } catch (Throwable $e) {
+            error_log('PO Inventory sync lookup: '.$e->getMessage());
+        }
+        // A verified Inventory Goods Receipt is independent of the PO's saved status.
+        try {
+            $gr=$conn->prepare('SELECT gr.receipt_number FROM procurement_inventory_receipts gr
+                WHERE gr.po_id=? AND gr.po_number=? AND EXISTS
+                    (SELECT 1 FROM procurement_inventory_receipt_items x WHERE x.receipt_id=gr.id AND x.accepted_qty>0)
+                ORDER BY gr.id DESC LIMIT 1');
+            $poNumber=(string)$po['po_number'];
+            $gr->bind_param('is',$id,$poNumber);
+            $gr->execute();
+            $row=$gr->get_result()->fetch_assoc();
+            $gr->close();
+            if ($row) {
+                $po['tracking_verified_receipt_count']=1;
+                $po['tracking_latest_receipt_number']=(string)$row['receipt_number'];
+            }
+        } catch (Throwable $e) {
+            error_log('PO verified receipt lookup: '.$e->getMessage());
+        }
+        // Optional live Inventory dispatch status. Never trust a different PO's status.
+        if ($invReqNumber !== '') {
+            try {
+                require_once __DIR__ . '/uniprocur-inventory-sync.php';
+                $inv=uniInventoryCall('requests','GET',[],['request_number'=>$invReqNumber]);
+                foreach (($inv['data'] ?? []) as $record) {
+                    if (is_array($record)
+                        && (string)($record['request_number'] ?? '') === $invReqNumber
+                        && (string)($record['po_number'] ?? '') === (string)$po['po_number']) {
+                        $po['tracking_inventory_delivery_status']=(string)($record['delivery_status'] ?? '');
+                        break;
+                    }
+                }
+            } catch (Throwable $e) {
+                error_log('PO Inventory dispatch lookup: '.$e->getMessage());
+            }
+        }
+        buyerPoJson(200, ['success' => true, 'buyer' => ['full_name' => $buyer['full_name'], 'email' => $buyer['email']], 'po' => $po, 'items' => $items]);
+    }
+    $stmt = $conn->prepare($sql . ' ORDER BY po.created_at DESC, po.id DESC');
+    $stmt->bind_param('iii', $buyerId, $buyerId, $buyerId);
+    $stmt->execute();
+    $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    buyerPoJson(200, [
+        'success' => true,
+        'buyer' => ['full_name' => $buyer['full_name'], 'email' => $buyer['email']],
+        'orders' => $orders,
+        'count' => count($orders)
+    ]);
+} catch (Throwable $error) {
+    error_log('Get Buyer Purchase Orders: ' . $error->getMessage());
+    buyerPoJson(500, ['success' => false, 'message' => 'Unable to load Buyer Purchase Orders. Check PHP and MySQL logs.']);
+}

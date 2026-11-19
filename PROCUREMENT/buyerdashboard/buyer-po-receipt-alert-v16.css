@@ -1,0 +1,25 @@
+/* UNIPROCUR_PO_REJECTION_V16: addition only, preserves Figma design */
+.track-step.po-v16-partial .track-node { background:#f3a315; border-color:#f3a315; box-shadow:0 0 0 4px rgba(243,163,21,.14); }
+.track-step.po-v16-partial small { color:#855100; font-weight:700; }
+.po-receipt-v16 { margin-top:17px; padding:17px 18px; border:1px solid #e0e0e0; border-radius:9px; background:#fff; font-family:Inter,Arial,sans-serif; }
+.po-receipt-v16[hidden]{display:none!important}
+.po-v16-headline { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:14px; color:#222; }
+.po-v16-source { padding:5px 9px; background:#e8f6ee; border:1px solid #acd6bf; border-radius:15px; color:#225d41; font-size:11px; white-space:nowrap; }
+.po-v16-numbers { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0; }
+.po-v16-quantity { display:flex;flex-direction:column;gap:4px;padding:11px 8px;background:#f7f7f7;border:1px solid #e5e5e5;border-radius:7px;text-align:center; }
+.po-v16-quantity span { font-size:11px; color:#555; }
+.po-v16-quantity strong { font-size:20px; color:#1c1c1c; font-variant-numeric:tabular-nums; }
+.po-v16-rejected { background:#fff2f2; border-color:#f2cece; }
+.po-v16-rejected strong { color:#aa1515; }
+.po-v16-link { display:inline-block; margin:0 0 8px; color:#9c0c0c; font-weight:650; font-size:12px; text-decoration:underline; }
+.po-v16-alert { margin-top:11px; padding:13px; border:1px solid #eca7a7; border-left:4px solid #c21515; border-radius:7px; background:#fff4f4; }
+.po-v16-alert > strong { color:#971313; font-size:13px; }
+.po-v16-alert p { margin:7px 0 0; font-size:12px; line-height:1.5; }
+.po-v16-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:12px; }
+.po-v16-action { display:inline-block; background:#af1414; color:white; padding:10px 13px; border-radius:7px; font-weight:700; font-size:12px; text-decoration:none; }
+.po-v16-action:hover { background:#8a1010;color:#fff; }
+.po-v16-muted { color:#606b77; font-size:11px; line-height:1.5; }
+.po-v16-warning { background:#fff7dd; border:1px solid #eed69b; color:#7a4b00; border-radius:6px; padding:10px; font-size:12px; }
+.po-v16-footnote { margin:13px 0 0; color:#687382; font-size:10.5px; line-height:1.45; }
+@media(max-width:600px){.po-receipt-v16{padding:12px}.po-v16-quantity strong{font-size:17px}.po-v16-headline{flex-wrap:wrap}.po-v16-actions{align-items:stretch; flex-direction:column}.po-v16-action{text-align:center}}
+@media print {.po-receipt-v16{display:none!important}}

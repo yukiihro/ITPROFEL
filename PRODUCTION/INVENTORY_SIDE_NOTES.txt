@@ -1,0 +1,42 @@
+INVENTORY-SIDE PROBLEMS (found while aligning production build 40 with FIRST_API / inventory_management)
+Production was changed only. These need a change in Inventory, which production cannot do for you.
+
+1) FILING A MATERIAL REQUEST FAILS - create_incoming_request_notifications() is not defined
+   Inventory's api/requests.php (POST) calls create_incoming_request_notifications(...) but no file in inventory_management defines it.
+   PHP stops with "Call to undefined function", the database transaction is rolled back, so NOTHING is filed.
+   Production now says exactly this instead of "cannot reach the Inventory API".
+   Suggested fix - add to Inventory's php/database.php (it only uses helpers that already exist there):
+
+   function create_incoming_request_notifications($pdo,$requestId,$requestNumber,$destination,$actorUserId,$requesterName,$fromApi=false)
+   {
+       $title="New Request";
+       $msg="Request ".$requestNumber." was submitted by ".$requesterName." for ".$destination.".";
+       create_notification_for_team($pdo,$destination,$title,$msg,'request',null);
+       create_notification_for_admins($pdo,$title,$msg,'request',null);
+   }
+
+2) INVENTORY MAY NOT BE ABLE TO APPROVE PRODUCTION'S RAW-MATERIAL REQUESTS
+   (read from the code - confirm by approving one test request in Inventory)
+   Production can only file requests with destination = Production (the API forces destination = the calling team).
+   Inventory's request_expected_item_type() in php/requests.php maps Production -> "Finished Good", and Approve resolves every
+   line with that item type. A Raw Material line from production is then refused with
+   "Item ... could not be matched to an active inventory item. Check Item Master name, size, and item type."
+   Product requests (Inventory -> Production, Finished Goods) are not affected. If production must receive raw materials from
+   Inventory, Inventory has to accept Raw Material items when the request was made by the destination team itself.
+
+3) API KEY
+   Inventory's api/config.php now reads the key ONLY from the IMS_API_KEY server variable. If it is not set, every API call is refused (401).
+   Set it on the host (httpd.conf / httpd-vhosts.conf:  SetEnv IMS_API_KEY "your-long-random-key"), restart Apache.
+   Production reads the same variable (or inventory_api_key in php/config.local.php); the two must match.
+   Open php/diagnose.php as supervisor to see whether the key is accepted.
+
+4) REQUESTER TEAM LEFT BLANK
+   Inventory stores requests.requester_team from the user's name/email. A user whose name/email has no team word leaves it blank.
+   Production only treats a request as an Inventory product request when requester_team = Inventory, and Inventory's
+   deliveries API refuses anything else. php/diagnose.php lists such requests ("invisible to production").
+
+5) INVENTORY DELIVERY PROGRESS PAGE IS EMPTY (build 44)
+   Inventory's php/deliveries.php reads deliveries.receipt_confirmed_at, which no Inventory script or SQL file creates, so the list fails.
+   Production can repair it from its own side: open php/inventory-delivery-fix.php as supervisor and press the button
+   (it adds that one nullable column to the Inventory database; optional settings inventory_db_name / inventory_db_user / inventory_db_pass in php/config.local.php).
+   Permanent fix: Inventory should add the column to inventory_system.sql / its migrations.

@@ -1,0 +1,54 @@
+/* UniProcur v12 - one-page discrepancy review. Presentation only.
+   Original API validation/ON HOLD/Finance restrictions remain in place. */
+.disc-modal [hidden],.disc-modal [hidden] * {display:none!important}
+.disc-modal {width:min(940px,calc(100vw - 24px));max-height:calc(100vh - 24px);padding:22px;background:#fff}
+#discSingleHeader{display:flex;align-items:start;justify-content:space-between;border-bottom:1px solid #ead8d8;margin-bottom:14px;padding-bottom:12px;gap:18px}
+#discSingleHeader small{color:#991b1b;font-weight:750;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+#discSingleHeader h2{font-size:22px;line-height:1.2;margin:5px 0 6px}
+#discSingleHeader p{margin:0;color:#666;font-size:12px;line-height:1.45}
+#discSingleClose{background:#f5f5f5;border:0;border-radius:7px;color:#5b5b5b;cursor:pointer;font-size:24px;width:34px;height:34px;flex:0 0 auto}
+.disc-modal #discResolveForm,.disc-modal #discEditForm,.disc-modal #discSingleFinal {border:1px solid #e3e0e0;border-radius:11px;padding:16px 18px;margin:12px 0;background:#fff}
+.disc-modal #discResolveForm > h2,.disc-modal #discEditForm > h2,.disc-modal #discSingleFinal > h2{font-size:16px;font-weight:750;margin:0 0 6px}
+.disc-modal #discResolveIntro,.disc-modal #discEditForm > .disc-description,.disc-single-hint{font-size:12px;line-height:1.55;color:#686868;margin:5px 0 12px}
+.disc-modal #discWizardProgress,.disc-modal #discResolveForm > .disc-actions,.disc-modal #discEditForm .disc-actions > :not(#discEditSave),.disc-modal #discGoToVerify{display:none!important}
+.disc-modal #discEditForm .disc-edit-fields{display:none!important}
+.disc-modal #discEditForm .disc-single-ref{display:block;font-weight:700;margin:14px 0 5px}
+.disc-modal #discEditForm .disc-single-ref input{width:100%;max-width:480px;display:block;box-sizing:border-box;margin-top:7px;padding:10px;border:1px solid #bbb;border-radius:7px}
+.disc-modal #discMailPanel{padding:12px;border-color:#e6d7d7;border-radius:9px;background:#fff;margin:13px 0 0}
+.disc-modal #discMailPanel legend{font-size:12px;font-weight:700;color:#71211e}
+.disc-modal #discMailPanel > .disc-description{font-size:11px;margin:7px 0;line-height:1.4;color:#555}
+.disc-modal #discGmailV9{margin:4px 0 10px;padding:10px}
+.disc-modal #discGmailV9 strong{font-size:12px}
+.disc-modal #discGmailV9 p{font-size:11px;line-height:1.5}
+.disc-modal #discVerifiedGrV10{padding:10px;margin:8px 0}
+.disc-modal #discVerifiedGrV10 strong,.disc-modal #discVerifiedGrV10 p{font-size:11px}
+.disc-modal #discSingleQty{margin:10px 0 8px}
+.disc-single-qty-row{display:grid;grid-template-columns:minmax(150px,1.25fr) repeat(3,minmax(80px,1fr));gap:8px;align-items:center;background:#f9f9f9;border:1px solid #ebebeb;border-radius:9px;padding:9px;margin:7px 0}
+.disc-single-qty-row>strong{font-size:12px;overflow-wrap:anywhere}
+.disc-single-stat{display:flex;flex-direction:column;gap:3px;padding:4px;text-align:center}
+.disc-single-stat small{color:#666;font-size:10px}
+.disc-single-stat b{font-size:19px;font-weight:750}
+.disc-single-stat:last-child b{color:#b91c1c}
+.disc-modal #discSingleAdvanced,.disc-modal #discSingleMailDetails{margin:9px 0 12px;border:1px solid #e6e6e6;border-radius:7px;background:#fdfdfd}
+.disc-modal #discSingleAdvanced summary,.disc-modal #discSingleMailDetails summary{font-size:12px;font-weight:650;padding:11px 12px;cursor:pointer;color:#555}
+.disc-modal .disc-single-advanced-body{padding:4px 12px 12px;border-top:1px solid #eee}
+.disc-modal #discSingleAdvanced .disc-edit-total label,.disc-modal #discSingleAdvanced .disc-edit-total input{max-width:300px}
+.disc-modal #discSingleAmount{font-size:16px;font-weight:750;color:#7d1e1e;padding:11px 12px;background:#fbf2f2;border-radius:8px;margin:14px 0 10px}
+.disc-modal #discMailPanel .disc-doc-reviewed{font-size:12px;line-height:1.5}
+.disc-modal #discMailPanel #discSaveEmail{border:1px solid #bbb;color:#373737;background:#fafafa;font-size:12px;padding:9px 13px;border-radius:7px;cursor:pointer}
+.disc-modal #discEditForm .disc-doc-reviewed{display:flex;gap:9px;align-items:center;font-size:12px;line-height:1.5;margin:15px 0}
+.disc-modal #discEditSave,.disc-modal #discResolve{background:#971d1d;color:white;border:0;border-radius:8px;padding:12px 18px;font-weight:750;font-size:12px;cursor:pointer}
+.disc-modal #discResolve[disabled]{opacity:.45;cursor:not-allowed}
+.disc-modal #discEditForm .disc-actions{margin:7px 0 4px}
+.disc-modal #discSingleFinal label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}
+.disc-modal #discSingleFinal #discResolution{box-sizing:border-box;width:100%;min-height:68px;resize:vertical;border:1px solid #c7c7c7;border-radius:7px;padding:10px;font-size:12px}
+.disc-modal #discSingleFinal .disc-single-final-actions{display:flex;justify-content:end;margin:13px 0 0}
+.disc-modal #discMailPanel #discAutoBillPreview{font-size:11px;margin:8px 0}
+.disc-modal #discMailPanel #discMailFeedback,.disc-modal #discEditForm #discEditFeedback,.disc-modal #discSingleFinal #discResolveFeedback{font-size:12px;line-height:1.5;white-space:normal}
+@media (max-width:650px){
+ .disc-modal{padding:12px}
+ .disc-modal #discResolveForm,.disc-modal #discEditForm,.disc-modal #discSingleFinal{padding:12px}
+ .disc-single-qty-row{grid-template-columns:repeat(3,1fr)}
+ .disc-single-qty-row>strong{grid-column:span 3;text-align:left}
+ .disc-single-stat b{font-size:16px}
+}

@@ -1,0 +1,42 @@
+[
+    {
+        "id": "USR-001",
+        "username": "admin",
+        "email": "admin26@gmail.com",
+        "fullName": "Administrator",
+        "role": "Administrator",
+        "phone": "",
+        "password": "$2y$12$ADmj6D2QqL0tsMZaLcaEQOWdaXrMv1UP61INHCq0kZ1Uvv6UeSUvi",
+        "createdAt": "2026-09-18T10:50:28+00:00"
+    },
+    {
+        "id": "USR-002",
+        "username": "jmmendoza@gmail.com",
+        "email": "jmmendoza@gmail.com",
+        "fullName": "Juan Miguel Mendoza",
+        "role": "Finance Staff",
+        "phone": "",
+        "password": "$2y$10$5TpBNGdpFIwF6STUcRQCi.8XAg3o0lbDbimnnJth7VMsc6Wz\/TnzG",
+        "createdAt": "2026-09-27T15:07:31+02:00"
+    },
+    {
+        "id": "USR-003",
+        "username": "marasiganmj58@gmail.com",
+        "email": "marasiganmj58@gmail.com",
+        "fullName": "Marasigan",
+        "role": "Finance Staff",
+        "phone": "",
+        "password": "$2y$10$BwHOakWahNHGPH8ANQwufOeu.Jn36Jo.Hx5y30g9TQKViwufUTC8u",
+        "createdAt": "2026-09-27T15:24:47+02:00"
+    },
+    {
+        "id": "USR-004",
+        "username": "walangkaninbuseng@gmail.com",
+        "email": "walangkaninbuseng@gmail.com",
+        "fullName": "bainabai",
+        "role": "Finance Staff",
+        "phone": "0917-000-0000",
+        "password": "$2y$10$Vz6JeW\/FEVsNOxioN8fYEeVHHmNIJcziQvPX2TLRLybtcSMNO1HSi",
+        "createdAt": "2026-09-27T16:00:36+02:00"
+    }
+]

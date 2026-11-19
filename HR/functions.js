@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (user) localStorage.setItem('devs_profile', JSON.stringify(user));
         updateAvatarFromProfile();
         applySidebarRestrictions();
+        void loadRealNotifications();
     }
 
     function updateAvatarFromProfile() {
@@ -229,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cycleStart = new Date(range.year, range.monthIndex, range.startDay, 0, 0, 0).getTime();
         const cycleEnd = new Date(range.year, range.monthIndex, range.endDay, 23, 59, 59, 999).getTime();
         return store.leaves.reduce((total, leave) => {
-            if (leave.empId !== empId || leave.status !== 'Approved') return total;
+            if (String(leave.empId) !== String(empId) || leave.status !== 'Approved') return total;
             const leaveFrom = getDayStamp(leave.from);
             const leaveTo = getDayStamp(leave.to);
             if (leaveFrom === null || leaveTo === null) return total;
@@ -241,16 +242,157 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 0);
     }
 
-    function applyLeavePayrollRule() {
+    function payrollKey(rec) {
+        const cycle = rec.payroll_period || rec.cycle || rec.period || '';
+        return `${Number(rec.empId)}|${cycle}`;
+    }
+
+    // Leave deduction for one payroll run = approved leave days that overlap its
+    // cycle × the employee's daily rate. The payslip, the Payroll page and the
+    // Deductions page all use this same figure so they stay in step.
+    function leaveAmountFor(pay) {
+        const emp = empById(pay.empId);
+        if (!emp) return 0;
+        const cycle = pay.payroll_period || pay.cycle || '';
+        const days = calculateApprovedLeaveDaysForEmployee(pay.empId, cycle);
+        return Math.round(days * (Number(emp.salary) || 0) / WORKING_DAYS_PER_MONTH);
+    }
+
+    // The non-leave (statutory/other) portion of a payroll's deductions. Kept on
+    // the row once computed so the leave portion is never added twice.
+    function payrollBaseAmount(pay) {
+        if (pay.baseDeductions !== undefined && pay.baseDeductions !== null) {
+            return Number(pay.baseDeductions) || 0;
+        }
+        const total = Number(pay.deductions) || 0;
+        const leave = leaveAmountFor(pay);
+        // If the stored total is smaller than the leave amount it can't include
+        // the leave, so the total is the base on its own.
+        return total >= leave ? total - leave : total;
+    }
+
+    function captureLeaveAmounts() {
+        const map = new Map();
+        store.payroll.forEach(pay => map.set(payrollKey(pay), leaveAmountFor(pay)));
+        return map;
+    }
+
+    // Recompute every payroll's total deduction as base + current leave.
+    // `prevLeave` (optional) holds the leave amounts from BEFORE a leave change,
+    // which lets us recover the true base instead of double-counting the leave.
+    function applyLeavePayrollRule(prevLeave) {
         store.payroll.forEach((pay) => {
             const emp = empById(pay.empId);
             if (!emp) return;
-            const baseDeductions = Number(pay.baseDeductions ?? pay.deductions ?? 0);
-            pay.baseDeductions = baseDeductions;
-            const approvedLeaveDays = calculateApprovedLeaveDaysForEmployee(pay.empId, pay.cycle);
-            const leaveDeduction = approvedLeaveDays * (emp.salary / WORKING_DAYS_PER_MONTH);
-            pay.deductions = Math.round(baseDeductions + leaveDeduction);
+            const total = Number(pay.deductions) || 0;
+            const before = prevLeave && prevLeave.has(payrollKey(pay))
+                ? prevLeave.get(payrollKey(pay))
+                : leaveAmountFor(pay);
+            const base = (pay.baseDeductions !== undefined && pay.baseDeductions !== null)
+                ? Number(pay.baseDeductions) || 0
+                : Math.max(0, total - before);
+            pay.baseDeductions = base;
+            pay.deductions = Math.round(base + leaveAmountFor(pay));
         });
+    }
+
+    /* The Deductions page mirrors Payroll: every row is derived from a payroll
+       record, split into its Leave (Unpaid) portion and the remaining
+       statutory/other amount, so the page total always equals the payroll total.
+       Manually recorded rows (if any) are shown and folded into that split. */
+    function deductionRows() {
+        const rows = [];
+        const manual = (store.deductions || []).filter(d => d && d.source !== 'leave');
+        const usedManual = new Set();
+
+        store.payroll.forEach(pay => {
+            const emp = empById(pay.empId);
+            const cycle = pay.payroll_period || pay.cycle || '';
+            if (!emp || !cycle) return;
+            const empId = Number(pay.empId);
+            const key = payrollKey(pay);
+            const slug = String(cycle).replace(/[^0-9A-Za-z]/g, '');
+            const total = Number(pay.deductions) || 0;
+            const leave = leaveAmountFor(pay);
+
+            const mine = manual.filter(d => payrollKey(d) === key);
+            let manualTotal = 0;
+            mine.forEach(d => { usedManual.add(d.id); manualTotal += Number(d.amount) || 0; rows.push(d); });
+
+            const base = mine.length ? Math.max(0, total - leave) : payrollBaseAmount(pay);
+            const remainder = Math.max(0, base - manualTotal);
+            if (remainder > 0) {
+                rows.push({
+                    id: `BASE-${empId}-${slug}`, empId,
+                    type: 'Other Deductions', period: cycle,
+                    amount: remainder, status: 'Applied', source: 'base'
+                });
+            }
+            if (leave > 0) {
+                rows.push({
+                    id: `LEAVE-${empId}-${slug}`, empId,
+                    type: 'Leave (Unpaid)', period: cycle,
+                    amount: leave, status: 'Applied', source: 'leave'
+                });
+            }
+        });
+
+        // Manual rows that aren't attached to any payroll still show.
+        manual.filter(d => !usedManual.has(d.id)).forEach(d => rows.push(d));
+        return rows;
+    }
+
+    /* One "account" = an employee within a payroll period. When a payroll has
+       more than one deduction line (e.g. unpaid leave + SSS), they are combined
+       into a single row so the page shows one total per account. The View modal
+       breaks the total back down into each deduction and why it was charged. */
+    function deductionGroups() {
+        const groups = new Map();
+        deductionRows().forEach(d => {
+            const key = `${Number(d.empId)}|${d.period || ''}`;
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    id: `DEDG-${Number(d.empId)}-${String(d.period || '').replace(/[^0-9A-Za-z]/g, '')}`,
+                    empId: d.empId,
+                    period: d.period || '',
+                    items: []
+                });
+            }
+            groups.get(key).items.push(d);
+        });
+        return [...groups.values()].map(g => {
+            const amount = g.items.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+            const statuses = g.items.map(d => d.status);
+            const status = statuses.includes('Pending') ? 'Pending'
+                : statuses.includes('Applied') ? 'Applied'
+                : (statuses[0] || 'Applied');
+            return { ...g, amount, status };
+        });
+    }
+
+    function deductionGroupLabel(group) {
+        const types = [...new Set(group.items.map(d => d.type).filter(Boolean))];
+        if (types.length <= 1) return types[0] || 'Deduction';
+        if (types.length === 2) return types.join(' + ');
+        return `${types.length} deductions`;
+    }
+
+    // Plain-language reason shown in the View modal for each deduction line.
+    function deductionReason(d, emp) {
+        const lower = String(d.type || '').trim().toLowerCase();
+        if (lower.includes('leave')) {
+            const days = calculateApprovedLeaveDaysForEmployee(d.empId, d.period || '');
+            const dailyRate = emp ? (Number(emp.salary) || 0) / WORKING_DAYS_PER_MONTH : 0;
+            return `${days} unpaid leave day(s) within this period, charged at ${peso(dailyRate)} per day.`;
+        }
+        if (lower === 'other deductions') return 'Government contributions (SSS, PhilHealth, Pag-IBIG) and any other recorded deductions for this period.';
+        if (lower === 'sss') return 'Social Security System (SSS) contribution.';
+        if (lower === 'philhealth') return 'PhilHealth contribution.';
+        if (lower === 'pag-ibig') return 'Pag-IBIG (HDMF) contribution.';
+        if (lower === 'cash advance') return 'Salary cash advance repayment.';
+        if (lower === 'sss loan') return 'SSS salary loan repayment.';
+        if (lower === 'pag-ibig loan') return 'Pag-IBIG loan repayment.';
+        return 'Recorded deduction for this payroll period.';
     }
 
     async function syncStateFromServer() {
@@ -261,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function saveStore() {
+    function saveStore(activity = '') {
         // Build a set of valid numeric employee_ids from the current store.
         const validEmpIds = new Set(
             store.employees
@@ -307,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Build a payload that only includes non-empty arrays, so we never
         // tell the server to wipe a table we don't actually have data for.
         const payload = {};
-        const destructiveKeys = ['employees', 'attendance', 'leaves', 'payroll', 'payroll_deductions'];
+        const destructiveKeys = ['employees', 'attendance', 'leaves', 'payroll', 'deductions'];
         const safeKeys        = ['accounts', 'receivables', 'payables', 'cashBank', 'expenses', 'transactions', 'settings'];
 
         destructiveKeys.forEach(key => {
@@ -336,7 +478,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // ahead of the POST and wipe the local change.
         return apiRequest('state', {
             method: 'POST',
-            body: JSON.stringify({ state: payload })
+            body: JSON.stringify({
+                state: payload,
+                ...(activity ? { auditActivity: activity } : {})
+            })
         }).catch((err) => {
             console.error('saveStore failed:', err);
             toast('Could not save to server: ' + err.message, 'error');
@@ -424,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         if (entity === 'deductions') return {
             screen: 'Deductions', headers: ['ID', 'Employee', 'Type', 'Period', 'Amount ₱', 'Status'],
-            rows: store.deductions.map(d => [d.id, empById(d.empId)?.name || d.empId, d.type, d.period, d.amount, d.status])
+            rows: deductionRows().map(d => [d.id, empById(d.empId)?.name || d.empId, d.type, d.period, d.amount, d.status])
         };
         return null;
     }
@@ -1070,6 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logout:     { title: 'Logout',             subtitle: 'Sign out of your account.', build: buildLogout },
         deductions: { title: 'Deductions', subtitle: 'Manage employee salary deductions and contributions.', build: buildDeductions },
         pageAccess: { title: 'User Permission', subtitle: 'Control which pages each user can see.', build: buildPageAccessManager },
+        notifications: { title: 'Notifications', subtitle: 'All change notifications in one place.', build: buildNotificationsPage },
         noAccess:   { title: 'No Access', subtitle: 'Your account has no pages assigned.', build: buildNoAccessScreen }
     };
 
@@ -1120,6 +1266,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildDashboard() {
+        dashEmpCurrentPage = 1;
         const today = todayDateString();
         const totalEmp = store.employees.length;
 
@@ -1145,36 +1292,42 @@ document.addEventListener('DOMContentLoaded', () => {
               icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>' }
         ];
 
-        // --- Current payroll composition: one entry per employee ---
-        // The list covers the FULL roster (matching the "Total Employees"
-        // figure), with employees without a payroll record shown as
-        // "No payroll yet" but still clickable. Only employees with payroll
-        // get a slice in the donut ring.
+        // --- Current payroll composition: grouped by department ---
+        // The donut and legend now summarise net pay per department instead of
+        // per employee/account. Departments with no payroll are still listed
+        // as "No payroll yet", and clicking one opens a payroll breakdown.
         const DONUT_COLORS = ['#c8102e', '#f5a623', '#3b6fe0', '#2eae7d', '#8a5cd6', '#e07b39', '#3fb8c9'];
         const netOfPayroll = p => Number(p.net) || ((Number(p.gross) || 0) - (Number(p.deductions) || 0));
-        const netByEmp = new Map();
+        const deptNames = [...new Set(store.employees.map(e => e.dept || 'Unassigned'))]
+            .sort((a, b) => String(a).localeCompare(String(b)));
+        const netByDept = new Map();
+        const deptWithPayroll = new Set();
+        const empIdsWithPayroll = new Set();
         store.payroll.forEach(p => {
-            const id = String(p.empId);
-            netByEmp.set(id, (netByEmp.get(id) || 0) + netOfPayroll(p));
+            empIdsWithPayroll.add(String(p.empId));
+            const dept = empById(p.empId)?.dept || 'Unassigned';
+            netByDept.set(dept, (netByDept.get(dept) || 0) + netOfPayroll(p));
+            deptWithPayroll.add(dept);
         });
-        const payrollRoster = store.employees.map(e => ({
-            empId: String(e.id),
-            name: e.name,
-            net: netByEmp.get(String(e.id)) || 0,
-            hasPayroll: netByEmp.has(String(e.id))
-        })).sort((a, b) => (b.net - a.net) || String(a.name).localeCompare(String(b.name)));
-        // Employees on Payroll: everyone with at least one payroll record
-        // in the current cycle.
-        const employeesOnPayroll = payrollRoster.filter(r => r.hasPayroll).length;
+        const payrollByDept = deptNames.map(dept => ({
+            dept,
+            net: netByDept.get(dept) || 0,
+            employees: store.employees.filter(e => (e.dept || 'Unassigned') === dept).length,
+            hasPayroll: deptWithPayroll.has(dept)
+        })).sort((a, b) => (b.net - a.net) || String(a.dept).localeCompare(String(b.dept)));
+        // "Employees on Payroll" stays a headcount, not a department grouping,
+        // so it is derived from the payroll records directly.
+        const employeesOnPayroll = store.employees.filter(e => empIdsWithPayroll.has(String(e.id))).length;
 
         // --- Payroll summary stats (donut + footer share the same total) ---
-        const totalPayroll   = payrollRoster.reduce((s, d) => s + d.net, 0);
-        const pendingPayroll = store.payroll.filter(p => /pending|progress/i.test(p.status || '')).length;
+        const totalPayroll        = [...netByDept.values()].reduce((s, n) => s + n, 0);
+        const pendingPayroll      = store.payroll.filter(p => /pending|progress/i.test(p.status || '')).length;
+        const departmentsOnPayroll = deptWithPayroll.size;
 
-        // Donut geometry — paid employees become stroke-dasharray slices
+        // Donut geometry — departments with net pay become stroke-dasharray slices
         const DONUT_R = 70, DONUT_CIRC = 2 * Math.PI * DONUT_R;
         const donutTotal = totalPayroll > 0 ? totalPayroll : 0;
-        const paidSegs = payrollRoster.filter(r => r.net > 0);
+        const paidSegs = payrollByDept.filter(d => d.net > 0);
         let donutAcc = 0;
         const donutSegs = paidSegs.map((d, i) => {
             const startLen = DONUT_CIRC * (donutAcc / (donutTotal || 1));
@@ -1189,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 startLen, segLen
             };
         });
-        const colorByEmp = new Map(donutSegs.map(s => [s.empId, s.color]));
+        const colorByDept = new Map(donutSegs.map(s => [s.dept, s.color]));
 
         return `
             <!-- Stat cards row (Finance style) -->
@@ -1242,6 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <tbody id="hrDashEmpTbody"></tbody>
                 </table>
                 </div>
+                <footer class="coa-pagination hr-dash-pagination" id="hrDashEmpPagination"></footer>
             </section>
 
             <!-- Current Payroll (Finance fin-summary-panel style) -->
@@ -1262,9 +1416,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${donutSegs.length ? `
                     <div class="hr-payroll-donut-wrap">
                         <div class="hr-payroll-donut">
-                            <svg viewBox="0 0 200 200" role="img" aria-label="Net pay distribution by employee">
+                            <svg viewBox="0 0 200 200" role="img" aria-label="Net pay distribution by department">
                                 <circle class="hr-donut-track" cx="100" cy="100" r="70" />
-                                ${donutSegs.map(s => `<circle class="hr-donut-slice" data-pd-emp="${escapeHtml(s.empId)}" cx="100" cy="100" r="70" fill="none" stroke="${s.color}" stroke-width="26" stroke-dasharray="${s.segLen.toFixed(2)} ${(DONUT_CIRC - s.segLen).toFixed(2)}" stroke-dashoffset="${(-s.startLen).toFixed(2)}" transform="rotate(-90 100 100)" />`).join('')}
+                                ${donutSegs.map(s => `<circle class="hr-donut-slice" data-pd-dept="${escapeHtml(s.dept)}" cx="100" cy="100" r="70" fill="none" stroke="${s.color}" stroke-width="26" stroke-dasharray="${s.segLen.toFixed(2)} ${(DONUT_CIRC - s.segLen).toFixed(2)}" stroke-dashoffset="${(-s.startLen).toFixed(2)}" transform="rotate(-90 100 100)" />`).join('')}
                             </svg>
                             <div class="hr-donut-center">
                                 <span>Total Net Pay</span>
@@ -1272,18 +1426,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
                         <ul class="hr-donut-legend" id="hrPayrollDonutLegend">
-                            ${payrollRoster.map(r => {
-                                const color = colorByEmp.get(r.empId) || '#cdbcbc';
-                                const pct = donutTotal > 0 && r.net > 0
-                                    ? `<em>${Number(((r.net / donutTotal) * 100).toFixed(1)).toString().replace(/\.0$/, '')}%</em>`
+                            ${payrollByDept.map(d => {
+                                const color = colorByDept.get(d.dept) || '#cdbcbc';
+                                const pct = donutTotal > 0 && d.net > 0
+                                    ? `<em>${Number(((d.net / donutTotal) * 100).toFixed(1)).toString().replace(/\.0$/, '')}%</em>`
                                     : '';
                                 return `
-                                <li data-pd-emp="${escapeHtml(r.empId)}" title="View ${escapeHtml(r.name)}'s payroll" class="${r.hasPayroll ? '' : 'is-empty'}">
+                                <li data-pd-dept="${escapeHtml(d.dept)}" title="View ${escapeHtml(d.dept)} payroll breakdown" class="${d.hasPayroll ? '' : 'is-empty'}">
                                     <span class="hr-donut-dot" style="background:${color};"></span>
                                     <div class="hr-donut-legend-text">
-                                        <span>${escapeHtml(r.name)}</span>
-                                        ${r.hasPayroll
-                                            ? `<strong>₱${r.net.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${pct}</strong>`
+                                        <span>${escapeHtml(d.dept)}<small class="hr-donut-dept-count">${d.employees} employee${d.employees === 1 ? '' : 's'}</small></span>
+                                        ${d.hasPayroll
+                                            ? `<strong>₱${d.net.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${pct}</strong>`
                                             : `<strong class="hr-donut-none">No payroll yet</strong>`}
                                     </div>
                                     <svg class="hr-donut-legend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -1301,11 +1455,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <footer class="fin-summary-footer">
                     <div class="fin-summary-stat">
                         <div class="fin-summary-stat-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/></svg>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="15" width="7" height="5" rx="1"/><rect x="14" y="15" width="7" height="5" rx="1"/></svg>
                         </div>
                         <div>
-                            <span>Total Employees</span>
-                            <strong>${totalEmp}</strong>
+                            <span>Departments on Payroll</span>
+                            <strong>${departmentsOnPayroll}</strong>
                         </div>
                     </div>
                     <div class="fin-summary-stat">
@@ -1329,23 +1483,27 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    /* Opens an individual employee's payroll records — launched from the
-       dashboard payroll donut legend/slices. */
-    function openPayrollEmpModal(empId) {
-        const emp = empById(empId);
-        const name = emp?.name || `Employee ${empId}`;
+    /* Opens a department's payroll breakdown — launched from the dashboard
+       payroll donut legend/slices. Individual employees are listed as rows so
+       the headline view stays department-based rather than per account. */
+    function openPayrollDeptModal(dept) {
+        const emps = store.employees.filter(e => (e.dept || 'Unassigned') === dept);
+        const empIds = new Set(emps.map(e => String(e.id)));
         const recs = store.payroll
-            .filter(p => String(p.empId) === String(empId))
+            .filter(p => empIds.has(String(p.empId)))
             .slice()
-            .sort((a, b) => String(b.payroll_period || b.cycle || '').localeCompare(String(a.payroll_period || a.cycle || '')));
+            .sort((a, b) => String(b.payroll_period || b.cycle || '').localeCompare(String(a.payroll_period || a.cycle || ''))
+                || String(empById(a.empId)?.name || '').localeCompare(String(empById(b.empId)?.name || '')));
         const totalNet = recs.reduce(
             (s, p) => s + (Number(p.net) || ((Number(p.gross) || 0) - (Number(p.deductions) || 0))), 0);
 
         const rows = recs.map(p => {
+            const emp = empById(p.empId);
             const gross = Number(p.gross_salary !== undefined ? p.gross_salary : p.gross) || 0;
             const net = Number(p.net) || (gross - (Number(p.deductions) || 0));
             return `
                 <tr>
+                    <td>${escapeHtml(emp?.name || `Employee ${p.empId}`)}</td>
                     <td><strong style="font-family:monospace;color:#555;">${escapeHtml(p.id || '—')}</strong></td>
                     <td>${escapeHtml(p.payroll_period || p.cycle || '—')}</td>
                     <td>${peso(gross)}</td>
@@ -1356,22 +1514,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
 
         openModal({
-            title: `${name} — Payroll`,
+            title: `${dept} — Payroll Breakdown`,
             size: 'lg',
             onCancel: closeModal,
             body: `
                 <div class="pd-modal">
                     <div class="pd-emp-head">
-                        <div class="cell-avatar pd-emp-avatar">${initials(name)}</div>
+                        <div class="cell-avatar pd-emp-avatar" style="background:#3b6fe0;">${initials(dept)}</div>
                         <div class="pd-emp-meta">
-                            <strong>${escapeHtml(name)}</strong>
-                            <span>${escapeHtml(emp?.position || '—')} · ${escapeHtml(emp?.dept || '—')} · ID ${escapeHtml(emp?.id || empId)}</span>
+                            <strong>${escapeHtml(dept)}</strong>
+                            <span>${emps.length} employee${emps.length === 1 ? '' : 's'} · ${recs.length} payroll record${recs.length === 1 ? '' : 's'}</span>
                         </div>
                     </div>
                     <div class="table-wrap">
                         <table class="data-table">
-                            <thead><tr><th>Payroll ID</th><th>Period</th><th>Gross</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead>
-                            <tbody>${rows || '<tr><td colspan="6"><div class="empty-state"><p>No payroll records yet.</p></div></td></tr>'}</tbody>
+                            <thead><tr><th>Employee</th><th>Payroll ID</th><th>Period</th><th>Gross</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead>
+                            <tbody>${rows || '<tr><td colspan="7"><div class="empty-state"><p>No payroll records yet for this department.</p></div></td></tr>'}</tbody>
                         </table>
                     </div>
                     <div class="pd-modal-total">
@@ -1382,14 +1540,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let dashEmpCurrentPage = 1;
+    const DASH_EMP_ROWS_PER_PAGE = 7;
+
+    function filteredDashEmployees() {
+        const q = ($('#hrDashEmpSearch')?.value || '').trim().toLowerCase();
+        return store.employees.filter(e =>
+            matchesSearch(q, e.id, e.empNo, e.name, e.dept, e.position)
+        );
+    }
+
     function renderDashEmpRows() {
         const tbody = $('#hrDashEmpTbody');
         if (!tbody) return;
-        const q = ($('#hrDashEmpSearch')?.value || '').trim().toLowerCase();
-        const rows = store.employees.filter(e =>
-            matchesSearch(q, e.id, e.empNo, e.name, e.dept, e.position)
-        );
-        tbody.innerHTML = rows.map(e => {
+        const rows = filteredDashEmployees();
+        const totalPages = Math.max(1, Math.ceil(rows.length / DASH_EMP_ROWS_PER_PAGE));
+        if (dashEmpCurrentPage > totalPages) dashEmpCurrentPage = totalPages;
+        const start = (dashEmpCurrentPage - 1) * DASH_EMP_ROWS_PER_PAGE;
+        const pageRows = rows.slice(start, start + DASH_EMP_ROWS_PER_PAGE);
+
+        tbody.innerHTML = pageRows.map(e => {
             const st = (e.status || 'Active');
             const stCls = /active/i.test(st) ? 'is-paid' : /leave/i.test(st) ? 'is-fulfilling' : 'is-overdue';
             return `
@@ -1401,6 +1571,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td style="text-align:left"><span class="status-text ${stCls}">${escapeHtml(st)}</span></td>
             </tr>`;
         }).join('') || '<tr><td colspan="5" style="text-align:center;color:#888;padding:20px;">No employees found.</td></tr>';
+
+        renderDashEmpPagination(rows.length, totalPages);
+    }
+
+    function renderDashEmpPagination(totalRows, totalPages) {
+        const wrap = $('#hrDashEmpPagination');
+        if (!wrap) return;
+        if (!totalRows) { wrap.innerHTML = ''; return; }
+
+        const startPage = totalPages <= 3 ? 1 : Math.min(Math.max(1, dashEmpCurrentPage - 1), totalPages - 2);
+        const pages = Array.from({ length: Math.min(3, totalPages) }, (_, index) => startPage + index);
+        const atFirst = dashEmpCurrentPage <= 1;
+        const atLast  = dashEmpCurrentPage >= totalPages;
+        const firstRow = (dashEmpCurrentPage - 1) * DASH_EMP_ROWS_PER_PAGE + 1;
+        const lastRow = Math.min(firstRow + DASH_EMP_ROWS_PER_PAGE - 1, totalRows);
+
+        wrap.innerHTML = `
+            <span class="hr-dash-page-info">Showing ${firstRow}–${lastRow} of ${totalRows}</span>
+            <button type="button" class="coa-page-btn" data-page="prev" aria-label="Previous page" ${atFirst ? 'disabled' : ''}>&lt;</button>
+            ${pages.map(page => `<button type="button" class="coa-page-btn ${page === dashEmpCurrentPage ? 'is-active' : ''}" data-page="${page}">${page}</button>`).join('')}
+            <button type="button" class="coa-page-btn" data-page="next" aria-label="Next page" ${atLast ? 'disabled' : ''}>&gt;</button>
+            ${totalPages > 3 ? `<details class="coa-page-menu"><summary>Select Page</summary><div class="coa-page-options">${Array.from({ length: totalPages }, (_, index) => `<button type="button" class="coa-page-option" data-page="${index + 1}">${index + 1}</button>`).join('')}</div></details>` : ''}
+        `;
+    }
+
+    function handleDashEmpPagination(e) {
+        const btn = e.target.closest('.coa-page-btn, .coa-page-option');
+        if (!btn || btn.disabled) return;
+        const totalPages = Math.max(1, Math.ceil(filteredDashEmployees().length / DASH_EMP_ROWS_PER_PAGE));
+        const target = btn.dataset.page;
+        if (target === 'prev') dashEmpCurrentPage = Math.max(1, dashEmpCurrentPage - 1);
+        else if (target === 'next') dashEmpCurrentPage = Math.min(totalPages, dashEmpCurrentPage + 1);
+        else dashEmpCurrentPage = Number(target) || 1;
+        renderDashEmpRows();
     }
 
     let empCurrentPage = 1;
@@ -2175,6 +2379,123 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'is-pending';
     }
 
+    /* Payroll periods are free-form text ("November 15–30, 2026"), so the
+       print date range is worked out by parsing that text into real dates. */
+    const PERIOD_MONTHS = {
+        january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2,
+        april: 3, apr: 3, may: 4, june: 5, jun: 5, july: 6, jul: 6,
+        august: 7, aug: 7, september: 8, sept: 8, sep: 8,
+        october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11
+    };
+
+    const periodYmd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    function periodMonthOf(text) {
+        const word = ((String(text || '').match(/[A-Za-z]+/) || [])[0] || '').toLowerCase();
+        return Object.prototype.hasOwnProperty.call(PERIOD_MONTHS, word) ? PERIOD_MONTHS[word] : null;
+    }
+
+    function parsePeriodEdge(fragment, fallback) {
+        const text = String(fragment || '').trim();
+        if (!text) return null;
+        const month = periodMonthOf(text) !== null ? periodMonthOf(text) : (fallback ? fallback.month : null);
+        const dayMatch = text.match(/\b(\d{1,2})\b/);
+        const yearMatch = text.match(/\b(\d{4})\b/);
+        const day = dayMatch ? Number(dayMatch[1]) : 1;
+        const year = yearMatch ? Number(yearMatch[1]) : (fallback ? fallback.year : null);
+        if (month === null || year === null) return null;
+        return new Date(year, month, day);
+    }
+
+    function parsePayrollPeriodRange(period) {
+        const raw = String(period || '').trim();
+        if (!raw) return null;
+        // Normalise every range separator to "|". Plain hyphens are left alone
+        // for ISO dates, but split "November 15-30, 2026" into two edges.
+        let joined = raw.replace(/\s*(?:–|—|\bto\b|\bthrough\b)\s*/gi, '|');
+        if (!/^\d{4}-\d{1,2}-\d{1,2}/.test(raw)) joined = joined.replace(/\s*-\s*(?=\d)/g, '|');
+        const parts = joined.split('|').map(s => s.trim()).filter(Boolean);
+        if (!parts.length) return null;
+
+        const yearMatch = raw.match(/\b(\d{4})\b/);
+        const fallback = { month: periodMonthOf(raw), year: yearMatch ? Number(yearMatch[1]) : null };
+        let start = parsePeriodEdge(parts[0], fallback);
+        if (!start) return null;
+        let end = parts.length > 1
+            ? parsePeriodEdge(parts[parts.length - 1], { month: start.getMonth(), year: start.getFullYear() })
+            : new Date(start.getFullYear(), start.getMonth() + 1, 0);
+        if (!end) end = start;
+        if (end < start) { const tmp = start; start = end; end = tmp; }
+        return { start, end };
+    }
+
+    function payrollPrintDefaults() {
+        let from = null;
+        let to = null;
+        store.payroll.forEach(p => {
+            const range = parsePayrollPeriodRange(p.payroll_period || p.cycle);
+            if (!range) return;
+            if (!from || range.start < from) from = range.start;
+            if (!to || range.end > to) to = range.end;
+        });
+        if (!from || !to) {
+            const now = new Date();
+            from = new Date(now.getFullYear(), now.getMonth(), 1);
+            to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+        return { from: periodYmd(from), to: periodYmd(to) };
+    }
+
+    function payrollInPrintRange(p, from, to) {
+        const range = parsePayrollPeriodRange(p.payroll_period || p.cycle);
+        let start;
+        let end;
+        if (range) {
+            start = range.start;
+            end = range.end;
+        } else {
+            // Unparseable period — fall back to the date the record was created.
+            const raw = String(p.created_at || '').slice(0, 10);
+            if (!raw) return true;
+            const bits = raw.split('-').map(Number);
+            if (bits.length !== 3 || bits.some(n => !Number.isFinite(n))) return true;
+            start = end = new Date(bits[0], bits[1] - 1, bits[2]);
+        }
+        return periodYmd(start) <= to && periodYmd(end) >= from;
+    }
+
+    function payrollRowHtml(p) {
+        const emp = empById(p.empId);
+        const empName = emp ? emp.name : p.empId;
+        const hired = emp?.joined ? String(emp.joined) : '—';
+        const cycle = p.payroll_period || p.cycle || '—';
+        const gross = p.gross_salary !== undefined ? Number(p.gross_salary) : (Number(p.gross) || 0);
+        const deductions = Number(p.deductions) || 0;
+        const overtime = p.overtime !== undefined ? Number(p.overtime) : 0;
+        const absences = p.absences !== undefined ? Number(p.absences) : 0;
+
+        return `
+            <tr data-id="${escapeHtml(p.id || '')}">
+                <td><strong style="font-family:monospace;color:#555;">${escapeHtml(p.id || 'Pending')}</strong></td>
+                <td>${escapeHtml(empName)}</td>
+                <td>${escapeHtml(hired)}</td>
+                <td>${escapeHtml(cycle)}</td>
+                <td>${peso(gross)}</td>
+                <td>+${peso(overtime)}</td>
+                <td>${absences} Day${absences === 1 ? '' : 's'}</td>
+                <td>-${peso(deductions)}</td>
+                <td><span class="status-text ${statusClassForPayroll(p.status)}">${escapeHtml(p.status)}</span></td>
+                <td>
+                    <div class="cell-actions" style="justify-content:flex-end;">
+                        <button class="coa-view-btn" type="button" data-act="viewPayslip" data-id="${escapeHtml(p.id)}">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            View
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+    }
+
     function renderPayrollRows() {
         const tbody = $('#payrollTbody');
         if (!tbody) return;
@@ -2198,42 +2519,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let html = pageRows.map(p => {
-            const emp = empById(p.empId);
-            const empName = emp ? emp.name : p.empId;
-            const hired = emp?.joined ? String(emp.joined) : '—';
-            
-            // Read directly from DB columns (or fallback if missing)
-            const cycle = p.payroll_period || p.cycle || '—';
-            const gross = p.gross_salary !== undefined ? Number(p.gross_salary) : (Number(p.gross) || 0);
-            const deductions = Number(p.deductions) || 0;
-            const overtime = p.overtime !== undefined ? Number(p.overtime) : 0;
-            const absences = p.absences !== undefined ? Number(p.absences) : 0;
-            
-            return `
-            <tr data-id="${escapeHtml(p.id || '')}">
-                <td><strong style="font-family:monospace;color:#555;">${escapeHtml(p.id || 'Pending')}</strong></td>
-                <td>${escapeHtml(empName)}</td>
-                <td>${escapeHtml(hired)}</td>
-                <td>${escapeHtml(cycle)}</td>
-                <td>${peso(gross)}</td>
-                <td>+${peso(overtime)}</td>
-                <td>${absences} Day${absences === 1 ? '' : 's'}</td>
-                <td>-${peso(deductions)}</td>
-                <td><span class="status-text ${statusClassForPayroll(p.status)}">${escapeHtml(p.status)}</span></td>
-                <td>
-                    <div class="cell-actions" style="justify-content:flex-end;">
-                        <button class="coa-view-btn" type="button" data-act="viewPayslip" data-id="${escapeHtml(p.id)}">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
-                            View
-                        </button>
-                        <button class="coa-view-btn coa-view-btn-danger" type="button" data-act="deletePayroll" data-id="${escapeHtml(p.id)}">
-                            Delete
-                        </button>
-                    </div>
-                </td>
-            </tr>`;
-        }).join('');
+        let html = pageRows.map(payrollRowHtml).join('');
 
         const missing = PAYROLL_ROWS_PER_PAGE - pageRows.length;
         for (let i = 0; i < missing; i++) {
@@ -2242,6 +2528,74 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = html;
 
         renderPayrollPagination(totalPages);
+    }
+
+    function openPayrollPrintDialog() {
+        const defaults = payrollPrintDefaults();
+        openModal({
+            title: ' ',
+            size: 'sm',
+            onCancel: closeModal,
+            onSubmit: (form) => {
+                const data = Object.fromEntries(new FormData(form).entries());
+                const from = String(data.from || '');
+                const to = String(data.to || '');
+                if (!from || !to) { toast('Please choose both a From and a To date.', 'error'); return; }
+                if (from > to) { toast('The From date must be on or before the To date.', 'error'); return; }
+                const matched = store.payroll.filter(p => payrollInPrintRange(p, from, to));
+                if (!matched.length) {
+                    toast(`No payroll records found from ${from} to ${to}.`, 'error');
+                    return;
+                }
+                closeModal();
+                printPayrollRange(matched, from, to);
+            },
+            body: `
+                <form id="payrollPrintForm">
+                    <h3 style="margin:0 0 6px;font-size:17px;font-weight:700;">Print Payroll</h3>
+                    <p style="margin:0 0 20px;color:#777;font-size:13px;line-height:1.5;">
+                        Choose the dates to print. Only payroll records whose period falls within this range will be included.
+                    </p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div class="form-field">
+                            <label for="pp-from">From <b class="req">*</b></label>
+                            <input type="date" id="pp-from" name="from" value="${defaults.from}" required />
+                        </div>
+                        <div class="form-field">
+                            <label for="pp-to">To <b class="req">*</b></label>
+                            <input type="date" id="pp-to" name="to" value="${defaults.to}" required />
+                        </div>
+                    </div>
+                    <p style="margin:14px 0 0;font-size:12px;color:#888;">
+                        ${store.payroll.length} payroll record(s) on file. Every record in the range is printed, not just the current page.
+                    </p>
+                    <div class="form-actions" style="margin-top:18px;">
+                        <button type="button" class="btn btn-subtle" data-act="cancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Print</button>
+                    </div>
+                </form>
+            `
+        });
+    }
+
+    function printPayrollRange(rows, from, to) {
+        const tbody = $('#payrollTbody');
+        const periodEl = $('#payrollPrintPeriod');
+        if (!tbody) return;
+        const savedRows = tbody.innerHTML;
+        const savedPeriod = periodEl ? periodEl.textContent : '';
+        const restore = () => {
+            tbody.innerHTML = savedRows;
+            if (periodEl) periodEl.textContent = savedPeriod;
+            window.removeEventListener('afterprint', restore);
+            clearTimeout(fallbackTimer);
+        };
+        const fallbackTimer = setTimeout(restore, 1500);
+        window.addEventListener('afterprint', restore);
+
+        tbody.innerHTML = rows.map(payrollRowHtml).join('');
+        if (periodEl) periodEl.textContent = `From ${from} to ${to}`;
+        requestAnimationFrame(() => window.print());
     }
 
     function renderPayrollPagination(totalPages) {
@@ -3451,45 +3805,112 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function buildDeductions() {
-        const types = [...new Set(store.deductions.map(d => d.type))];
+        dedCurrentPage = 1;
+        const types = [...new Set(deductionRows().map(d => d.type).filter(Boolean))];
         return `
-            <div class="section-title"><h2>Deductions</h2><span class="hint" id="dedCount"></span></div>
-            <div class="card">
-                <div class="toolbar">
-                    <div class="search-wrap"><input type="search" placeholder="Search by employee or type…" id="dedSearch" /></div>
-                    <select id="dedType"><option value="">All Types</option>${types.map(t => `<option>${escapeHtml(t)}</option>`).join('')}</select>
-                    <select id="dedStatus"><option value="">All Status</option><option>Applied</option><option>Pending</option><option>Cancelled</option></select>
-                    <div class="spacer"></div>
-                    <button class="btn btn-ghost btn-sm" type="button" data-export="deductions">Export CSV</button>
-                </div>
-                <div class="table-wrap">
-                    <table class="data-table">
-                        <thead><tr><th>Employee</th><th>Type</th><th>Period</th><th>Amount</th><th>Status</th></tr></thead>
+            <div class="emp-page-header">
+                <h2 class="emp-page-title">Deductions</h2>
+                <button class="coa-export-top-btn" type="button" data-export="deductions">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
+                    Export PDF / Excel
+                </button>
+            </div>
+
+            <section class="coa-card">
+                <header class="coa-card-head">
+                    <h3 class="coa-card-title">DEDUCTION LIST <span class="coa-card-count" id="dedCount"></span></h3>
+                    <div class="coa-toolbar">
+                        <div class="coa-search-box">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#888" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                            <input type="search" placeholder="Search employee, ID or type..." id="dedSearch" />
+                        </div>
+                        <div class="custom-filter-dropdown" data-id="dedTypeFilter">
+                            <button type="button" class="custom-filter-btn" data-value="" style="height: 32px; min-width: 150px; font-size: 13px;">
+                                <span class="cfb-text">Select Type</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                            </button>
+                            <ul class="custom-filter-menu">
+                                <li data-value="">All</li>
+                                ${types.map(t => `<li data-value="${escapeHtml(t)}">${escapeHtml(t)}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="custom-filter-dropdown" data-id="dedStatusFilter">
+                            <button type="button" class="custom-filter-btn" data-value="" style="height: 32px; min-width: 135px; font-size: 13px;">
+                                <span class="cfb-text">Select Status</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                            </button>
+                            <ul class="custom-filter-menu">
+                                <li data-value="">All</li>
+                                <li data-value="Applied">Applied</li>
+                                <li data-value="Pending">Pending</li>
+                                <li data-value="Cancelled">Cancelled</li>
+                            </ul>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="table-wrap coa-table-scroll">
+                    <table class="coa-table">
+                        <thead>
+                            <tr>
+                                <th>Employee ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Period</th>
+                                <th>Amount ₱</th>
+                                <th>Status</th>
+                                <th style="text-align:right;">Action</th>
+                            </tr>
+                        </thead>
                         <tbody id="dedTbody"></tbody>
                     </table>
                 </div>
+
                 <footer class="coa-pagination" id="dedPagination"></footer>
-            </div>
+            </section>
         `;
     }
 
     const DED_ROWS_PER_PAGE = 7;
     let dedCurrentPage = 1;
+    let dedDropdownOutsideBound = false;
+
+    function dedFilterState() {
+        return {
+            q: ($('#dedSearch')?.value || '').trim().toLowerCase(),
+            type: $('.custom-filter-dropdown[data-id="dedTypeFilter"] .custom-filter-btn')?.dataset.value || '',
+            status: $('.custom-filter-dropdown[data-id="dedStatusFilter"] .custom-filter-btn')?.dataset.value || ''
+        };
+    }
+
+    function visibleDeductionGroups() {
+        const { q, type, status } = dedFilterState();
+        return deductionGroups().map(g => {
+            const emp = empById(g.empId);
+            // A type filter narrows the account to just that deduction type, so
+            // the amount shown reflects the filtered deduction.
+            const items = type ? g.items.filter(d => d.type === type) : g.items;
+            if (!items.length) return null;
+            const amount = items.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+            const statuses = items.map(d => d.status);
+            const st = statuses.includes('Pending') ? 'Pending'
+                : statuses.includes('Applied') ? 'Applied'
+                : (statuses[0] || 'Applied');
+            const allText = g.items.map(d => idSearchText(d.id, d.empId, emp?.id, emp?.empNo, emp?.name || '', d.type, d.period, d.status)).join(' ');
+            const text = idSearchText(g.id, g.empId, emp?.id, emp?.empNo, emp?.name || '', deductionGroupLabel(g), g.period, st) + ' ' + allText;
+            if (q && !text.includes(q)) return null;
+            if (status && st !== status) return null;
+            return { ...g, items, amount, status: st };
+        }).filter(Boolean);
+    }
 
     function renderDeductionRows() {
         const tbody = $('#dedTbody');
         if (!tbody) return;
-        const q = ($('#dedSearch')?.value || '').trim().toLowerCase();
-        const type = $('#dedType')?.value || '';
-        const status = $('#dedStatus')?.value || '';
-        const rows = store.deductions.filter(d => {
-            const emp = empById(d.empId);
-            const text = idSearchText(d.id, d.empId, emp?.id, emp?.empNo, emp?.name || '', d.type, d.period, d.status);
-            return (!q || text.includes(q)) && (!type || d.type === type) && (!status || d.status === status);
-        });
+        const rows = visibleDeductionGroups();
         const countEl = $('#dedCount');
-        const total = rows.reduce((s, d) => s + Number(d.amount || 0), 0);
-        if (countEl) countEl.textContent = `${rows.length} record(s), Total: ${peso(total)}`;
+        const total = rows.reduce((s, g) => s + Number(g.amount || 0), 0);
+        if (countEl) countEl.textContent = `${rows.length} account(s) · Total: ${peso(total)}`;
 
         // Pagination — fixed page height via spacer rows
         const totalPages = Math.max(1, Math.ceil(rows.length / DED_ROWS_PER_PAGE));
@@ -3499,29 +3920,89 @@ document.addEventListener('DOMContentLoaded', () => {
         const pageRows = rows.slice(startIdx, startIdx + DED_ROWS_PER_PAGE);
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">◌</div><strong>No deductions found</strong><p>No records match the current filters.</p></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">◌</div><strong>No deductions found</strong><p>No records match the current filters.</p></div></td></tr>`;
             renderDedPagination(totalPages);
             return;
         }
-        tbody.innerHTML = pageRows.map(d => {
-            const emp = empById(d.empId);
+        tbody.innerHTML = pageRows.map(g => {
+            const emp = empById(g.empId);
+            const empName = emp ? emp.name : String(g.empId);
+            const empNo = emp?.empNo || String(emp?.id || g.empId).padStart(5, '0');
+            const statusClass = g.status === 'Applied' ? 'is-paid' : (g.status === 'Pending' ? 'is-fulfilling' : 'is-pending');
+            const count = g.items.length;
+            const types = [...new Set(g.items.map(d => d.type).filter(Boolean))];
+            let typeHtml;
+            if (types.length <= 1) {
+                typeHtml = escapeHtml(types[0] || 'Deduction');
+            } else if (types.length === 2) {
+                typeHtml = `${escapeHtml(types.join(' + '))} <span class="ded-combined-tag">${count} combined</span>`;
+            } else {
+                typeHtml = escapeHtml(`${types.length} deductions`);
+            }
             return `
-                <tr data-id="${d.id}">
-                    <td><div class="cell-name"><div class="cell-avatar">${initials(emp ? emp.name : d.empId)}</div><div>${escapeHtml(emp ? emp.name : d.empId)}<span class="cell-sub">${d.empId}</span></div></div></td>
-                    <td>${escapeHtml(d.type)}</td>
-                    <td>${escapeHtml(d.period)}</td>
-                    <td><strong>${peso(d.amount)}</strong></td>
-                    <td><span class="pill ${pillClass(d.status)}">${escapeHtml(d.status)}</span></td>
+                <tr data-id="${escapeHtml(String(g.id))}">
+                    <td>${escapeHtml(empNo)}</td>
+                    <td style="text-align:left"><div class="cell-name"><div class="cell-avatar">${initials(empName)}</div><div>${escapeHtml(empName)}</div></div></td>
+                    <td>${typeHtml}</td>
+                    <td>${escapeHtml(g.period)}</td>
+                    <td><strong>${peso(g.amount)}</strong></td>
+                    <td><span class="status-text ${statusClass}">${escapeHtml(g.status)}</span></td>
+                    <td style="text-align:right">
+                        <button class="coa-view-btn" type="button" data-act="viewDed" data-id="${escapeHtml(String(g.id))}">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                            View
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
 
         const missingRows = DED_ROWS_PER_PAGE - pageRows.length;
         for (let i = 0; i < missingRows; i++) {
-            tbody.innerHTML += `<tr class="at-spacer-row"><td colspan="5">&nbsp;</td></tr>`;
+            tbody.innerHTML += `<tr class="at-spacer-row"><td colspan="7">&nbsp;</td></tr>`;
         }
 
         renderDedPagination(totalPages);
+    }
+
+    function setupDedFilterDropdowns() {
+        [
+            { id: 'dedTypeFilter', fallback: 'Select Type' },
+            { id: 'dedStatusFilter', fallback: 'Select Status' }
+        ].forEach(({ id, fallback }) => {
+            const dd = $(`.custom-filter-dropdown[data-id="${id}"]`);
+            if (!dd) return;
+            const btn = dd.querySelector('.custom-filter-btn');
+            const label = dd.querySelector('.cfb-text');
+            const menu = dd.querySelector('.custom-filter-menu');
+            if (!btn || !label || !menu) return;
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dd.classList.toggle('open');
+            });
+
+            menu.addEventListener('click', (e) => {
+                const li = e.target.closest('li');
+                if (!li) return;
+                const value = li.dataset.value || '';
+                btn.dataset.value = value;
+                label.textContent = value || fallback;
+                btn.classList.toggle('is-active', !!value);
+                menu.querySelectorAll('li').forEach(item => item.classList.toggle('is-selected', item === li));
+                dd.classList.remove('open');
+                dedCurrentPage = 1;
+                renderDeductionRows();
+            });
+        });
+
+        if (!dedDropdownOutsideBound) {
+            dedDropdownOutsideBound = true;
+            document.addEventListener('click', (ev) => {
+                if (ev.target.closest('.custom-filter-dropdown')) return;
+                document.querySelectorAll('.custom-filter-dropdown.open').forEach(open => open.classList.remove('open'));
+            });
+        }
     }
 
     function renderDedPagination(totalPages) {
@@ -3544,9 +4025,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleDedPagination(e) {
         const btn = e.target.closest('.coa-page-btn, .coa-page-option');
         if (!btn || btn.disabled) return;
+        const totalPages = Math.max(1, Math.ceil(visibleDeductionGroups().length / DED_ROWS_PER_PAGE));
         const target = btn.dataset.page;
         if (target === 'prev') dedCurrentPage = Math.max(1, dedCurrentPage - 1);
-        else if (target === 'next') dedCurrentPage = Math.min(Math.max(1, Math.ceil(store.deductions.length / DED_ROWS_PER_PAGE)), dedCurrentPage + 1);
+        else if (target === 'next') dedCurrentPage = Math.min(totalPages, dedCurrentPage + 1);
         else dedCurrentPage = Number(target) || 1;
         renderDeductionRows();
     }
@@ -4087,12 +4569,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn) btn.addEventListener('click', throttle(() => openExportModal('leaves'), 350));
             dashboardPanel?.addEventListener('click', throttle(guard(handleLeaveAction), 120));
             renderDashEmpRows();
-            $('#hrDashEmpSearch')?.addEventListener('input', throttle(guard(renderDashEmpRows), 100));
-            // Payroll donut — clicking an employee slice or legend item opens
-            // that employee's individual payroll records.
+            $('#hrDashEmpSearch')?.addEventListener('input', throttle(guard(() => {
+                dashEmpCurrentPage = 1;
+                renderDashEmpRows();
+            }), 100));
+            $('#hrDashEmpPagination')?.addEventListener('click', guard(handleDashEmpPagination));
+            // Payroll donut — clicking a department slice or legend item opens
+            // that department's payroll breakdown.
             $('.hr-payroll-donut-wrap')?.addEventListener('click', guard((e) => {
-                const hit = e.target.closest('[data-pd-emp]');
-                if (hit?.dataset.pdEmp) openPayrollEmpModal(hit.dataset.pdEmp);
+                const hit = e.target.closest('[data-pd-dept]');
+                if (hit?.dataset.pdDept) openPayrollDeptModal(hit.dataset.pdDept);
             }));
         }
 
@@ -4147,7 +4633,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 else payrollCurrentPage = Number(target) || 1;
                 renderPayrollRows();
             }), 120));
-            $('#printPayrollBtn')?.addEventListener('click', (e) => { if (!lockElement(e.currentTarget, 600)) return; window.print(); });
+            $('#printPayrollBtn')?.addEventListener('click', (e) => { if (!lockElement(e.currentTarget, 600)) return; guard(openPayrollPrintDialog)(); });
             $('#createPayrollBtn')?.addEventListener('click', (e) => { if (!lockElement(e.currentTarget, 500)) return; guard(openCreatePayrollForm)(); });
         }
 
@@ -4323,9 +4809,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (page === 'deductions') {
             renderDeductionRows();
+            setupDedFilterDropdowns();
             $('#dedSearch')?.addEventListener('input', throttle(guard(() => { dedCurrentPage = 1; renderDeductionRows(); }), 100));
-            $('#dedType')?.addEventListener('change', throttle(guard(() => { dedCurrentPage = 1; renderDeductionRows(); }), 100));
-            $('#dedStatus')?.addEventListener('change', throttle(guard(() => { dedCurrentPage = 1; renderDeductionRows(); }), 100));
+            $('#dedTbody')?.addEventListener('click', throttle(guard(handleDeductionAction), 120));
             $('#dedPagination')?.addEventListener('click', throttle(guard(handleDedPagination), 120));
         }
 
@@ -4397,6 +4883,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         }
 
+        if (page === 'notifications') {
+            void loadNotificationsPage();
+            $('#notifPgMarkAll')?.addEventListener('click', throttle(guard(async () => {
+                await markAllNotificationsRead();
+                toast('All notifications marked as read.', 'success');
+            }), 300));
+            $('#notifPgList')?.addEventListener('click', (e) => {
+                const item = e.target.closest('.notif-item[data-notif-id]');
+                if (item) window.openHrNotif(item.dataset.notifId);
+            });
+        }
+
         if (page === 'settings') {
             $$('.sett-tab').forEach(tab => tab.addEventListener('click', () => {
                 const target = tab.dataset.tab;
@@ -4437,7 +4935,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         province: $('#sett-province').value, street: $('#sett-street').value,
                         brgy: $('#sett-brgy').value
                     };
-                    saveStore();
+                    saveStore('settings:updated');
                     renderPage('settings');
                     toast('Address updated.');
                 })();
@@ -4576,7 +5074,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!f) return;
                     fileToAvatar(f, (dataUrl) => {
                         emp.avatar = dataUrl;
-                        saveStore();
+                        saveStore('employee:updated');
                         renderEmployeeRows();
                         const photo = $('#empProfilePhoto');
                         if (photo) photo.innerHTML = `<img src="${dataUrl}" alt="" />`;
@@ -4641,7 +5139,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     store.employees.push({ id: customId || '', ...shared });
                     toast('Employee created successfully.');
                 }
-                await saveStore();
+                await saveStore(isEdit ? 'employee:updated' : 'employee:created');
                 closeModal();
                 renderEmployeeRows();
                 // Re-fetch from the server so all dependent rows pick up any
@@ -5148,7 +5646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ok = await confirmDialog({ title: 'Delete Employee', message: `Are you sure you want to remove ${emp.name}? This cannot be undone.`, confirmLabel: 'Delete', danger: true });
             if (!ok) return;
             store.employees = store.employees.filter(x => x.id !== id);
-            saveStore();
+            saveStore('employee:deleted');
             toast('Employee removed.', 'info');
             renderEmployeeRows();
         }
@@ -5186,7 +5684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     store.attendance.push({ id: nextId('ATT', store.attendance), empId: empIdNum, date: data.date, timeIn: data.timeIn || '', timeOut: data.timeOut || '', status: data.status });
                     toast('Attendance logged.');
                 }
-                saveStore();
+                saveStore(isEdit ? 'attendance:updated' : 'attendance:added');
                 closeModal();
                 renderAttendanceRows();
             },
@@ -5257,7 +5755,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ok = await confirmDialog({ title: 'Delete Attendance', message: 'Remove this attendance record?', confirmLabel: 'Delete', danger: true });
             if (!ok) return;
             store.attendance = store.attendance.filter(x => x.id !== id);
-            saveStore();
+            saveStore('attendance:deleted');
             toast('Record removed.', 'info');
             renderAttendanceRows();
         }
@@ -5308,7 +5806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         reason: (data.reason || '').trim() || 'No reason provided',
                         status: 'Pending'
                     });
-                    saveStore();
+                    saveStore('leave:submitted');
                     toast('Leave request submitted.');
                 }
                 closeModal();
@@ -5417,32 +5915,38 @@ document.addEventListener('DOMContentLoaded', () => {
         if (act === 'approve') {
             const ok = await confirmDialog({ title: 'Approve Leave', message: `Approve this ${l.type} for ${calcDays(l.from, l.to)} day(s)?`, confirmLabel: 'Approve' });
             if (!ok) return;
+            const prevLeave = captureLeaveAmounts();
             l.status = 'Approved';
-            applyLeavePayrollRule();
-            saveStore();
+            applyLeavePayrollRule(prevLeave);
+            saveStore('leave:approved');
             toast('Leave approved. Payroll deduction updated.');
             renderLeaveRows();
             renderPayrollRows();
+            if ($('#dedTbody')) renderDeductionRows();
         }
         if (act === 'reject') {
             const ok = await confirmDialog({ title: 'Reject Leave', message: 'Reject this leave request?', confirmLabel: 'Reject', danger: true });
             if (!ok) return;
+            const prevLeave = captureLeaveAmounts();
             l.status = 'Rejected';
-            applyLeavePayrollRule();
-            saveStore();
+            applyLeavePayrollRule(prevLeave);
+            saveStore('leave:rejected');
             toast('Leave rejected.', 'info');
             renderLeaveRows();
             renderPayrollRows();
+            if ($('#dedTbody')) renderDeductionRows();
         }
         if (act === 'deleteLeave') {
             const ok = await confirmDialog({ title: 'Delete Leave Record', message: `Delete ${recordEmployeeName(l)}'s ${leaveTypeLabel(l.type)} request? This cannot be undone.`, confirmLabel: 'Delete', danger: true });
             if (!ok) return;
+            const prevLeave = captureLeaveAmounts();
             store.leaves = store.leaves.filter(x => String(x.id) !== String(l.id));
-            applyLeavePayrollRule();
-            saveStore();
+            applyLeavePayrollRule(prevLeave);
+            saveStore('leave:deleted');
             toast('Leave record deleted.', 'info');
             renderLeaveRows();
             renderPayrollRows();
+            if ($('#dedTbody')) renderDeductionRows();
         }
         if (act === 'viewLeave') viewLeave(l);
     }
@@ -5538,22 +6042,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const p = store.payroll.find(x => String(x.id) === String(id));
             if (p) openPayslip(p);
         }
-
-        if (act === 'deletePayroll') {
-            if (!canManageRecords()) { toast('Only HR administrators can delete payroll records.', 'error'); return; }
-            const p = store.payroll.find(x => String(x.id) === String(id));
-            if (!p) return;
-            const ok = await confirmDialog({
-                title: 'Delete Payroll Record',
-                message: `Delete payroll ${p.id} for ${recordEmployeeName(p)}? This cannot be undone.`,
-                confirmLabel: 'Delete', danger: true
-            });
-            if (!ok) return;
-            store.payroll = store.payroll.filter(x => String(x.id) !== String(id));
-            saveStore();
-            toast('Payroll record deleted.', 'info');
-            renderPayrollRows();
-        }
     }
 
     function openCreatePayrollForm() {
@@ -5606,7 +6094,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     status: 'Pending'
                 });
 
-                await saveStore();
+                await saveStore('payroll:created');
                 closeModal();
                 toast('Payroll record created.');
                 
@@ -5700,6 +6188,80 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalEl) modalEl.classList.add('modal-split', 'voucher-modal');
     }
 
+    function openDeductionView(group) {
+        const items = group.items || [];
+        const emp = empById(group.empId);
+        const empName = emp ? emp.name : String(group.empId);
+        const empNo = emp?.empNo || String(emp?.id || group.empId).padStart(5, '0');
+        const dept = emp?.dept || '—';
+        const cycle = group.period || '';
+        const statusClass = group.status === 'Applied' ? 'is-paid' : (group.status === 'Pending' ? 'is-fulfilling' : 'is-pending');
+
+        const breakdown = items.map(d => `
+            <div class="ded-breakdown-item">
+                <div class="ded-breakdown-head">
+                    <span class="ded-breakdown-type">${escapeHtml(d.type)}</span>
+                    <strong class="ded-breakdown-amount">${peso(d.amount)}</strong>
+                </div>
+                <p class="ded-breakdown-reason">${escapeHtml(deductionReason(d, emp))}</p>
+            </div>
+        `).join('');
+
+        openModal({
+            title: ' ',
+            onCancel: closeModal,
+            body: `
+                <div class="view-modal-split">
+                    <div class="view-modal-left">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px;">
+                            <img src="assets/logo.png" style="height:44px;width:auto;object-fit:contain;flex-shrink:0;" alt="DEVS logo">
+                            <img src="assets/icon-devs.png" style="width:130px;height:auto;object-fit:contain;" alt="DEVS">
+                        </div>
+                        <h3 style="margin:0 0 8px;font-size:17px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;">DEDUCTION DETAILS</h3>
+                        <p style="margin:0;font-size:13px;line-height:1.5;color:rgba(255,255,255,0.82);">Why this employee was deducted and how the total was built up.</p>
+                        <div style="margin-top:auto;padding-bottom:16px;display:flex;justify-content:center;align-items:flex-end;">
+                            <svg viewBox="0 0 120 120" width="120" height="120" style="opacity:0.22;" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="24" y="16" width="72" height="88" rx="8"/>
+                                <path d="M40 40h40M40 58h40M40 76h24"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="view-modal-right">
+                        <div class="view-emp-head">
+                            <div class="view-emp-avatar">${initials(empName)}</div>
+                            <div>
+                                <h2>${escapeHtml(empName)}</h2>
+                                <p class="view-subtitle" style="margin:0 !important;">${escapeHtml(empNo)} · ${escapeHtml(dept)}</p>
+                            </div>
+                        </div>
+                        <div class="view-data-list">
+                            <div class="view-modal-row"><span>Employee ID:</span> <strong>${escapeHtml(empNo)}</strong></div>
+                            <div class="view-modal-row"><span>Department:</span> <strong>${escapeHtml(dept)}</strong></div>
+                            <div class="view-modal-row"><span>Payroll Period:</span> <strong>${escapeHtml(cycle || '—')}</strong></div>
+                            <div class="view-modal-row"><span>Deductions:</span> <strong>${items.length} item(s)</strong></div>
+                            <div class="view-modal-row"><span>Status:</span> <strong class="status-text ${statusClass}">${escapeHtml(group.status)}</strong></div>
+                        </div>
+
+                        <div class="ded-breakdown">
+                            <div class="ded-breakdown-title">What this deduction is for</div>
+                            ${breakdown}
+                            <div class="ded-breakdown-total">
+                                <span>Total Deduction</span>
+                                <strong>${peso(group.amount)}</strong>
+                            </div>
+                        </div>
+
+                        <div style="text-align:right;margin-top:24px;display:flex;justify-content:flex-end;gap:10px;">
+                            <button class="acc-btn-cancel" type="button" data-act="cancel">Close</button>
+                        </div>
+                    </div>
+                </div>
+            `
+        });
+        const modalEl = document.getElementById('modal');
+        if (modalEl) modalEl.className = 'modal modal-split receivable-view-modal ded-view-modal';
+    }
+
     function openDeductionForm(ded = null) {
         const isEdit = !!ded;
         const d = ded || { empId: '', type: 'SSS', period: currentPayrollCycle(), amount: '', status: 'Pending' };
@@ -5731,7 +6293,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     toast('Deduction added.');
                 }
                 applyLeavePayrollRule();
-                saveStore();
+                saveStore(isEdit ? 'deduction:updated' : 'deduction:added');
                 closeModal();
                 renderDeductionRows();
             },
@@ -5753,6 +6315,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = e.target.closest('button[data-act]');
         if (!btn) return;
         const { act, id } = btn.dataset;
+        if (act === 'viewDed') {
+            const group = visibleDeductionGroups().find(x => String(x.id) === String(id));
+            if (group) openDeductionView(group);
+            return;
+        }
         const ded = store.deductions.find(x => String(x.id) === String(id));
         if (!ded) return;
         if (act === 'editDed') openDeductionForm(ded);
@@ -5760,7 +6327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ok = await confirmDialog({ title: 'Delete Deduction', message: `Remove this ${ded.type} deduction of ${peso(ded.amount)}?`, confirmLabel: 'Delete', danger: true });
             if (!ok) return;
             store.deductions = store.deductions.filter(x => x.id !== id);
-            saveStore();
+            saveStore('deduction:deleted');
             toast('Deduction removed.', 'info');
             renderDeductionRows();
         }
@@ -5829,6 +6396,215 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const currentDateEl = $('#currentDate');
     if (currentDateEl) currentDateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+
+    // ============================================================
+    // NOTIFICATION SYSTEM (HR) — mirrors Finance's bell feed
+    // ============================================================
+    const bell = document.getElementById('topbarBell');
+    const popover = document.getElementById('notifPopover');
+    let notifications = [];
+    let notifPageItems = [];
+
+    function buildNotificationsPage() {
+        return `
+            <section class="exd-card exd-records">
+                <div class="exd-records-head">
+                    <h3 class="exd-title">Notifications</h3>
+                    <span class="notifpg-count" id="notifPgCount"></span>
+                    <button type="button" class="btn btn-subtle" id="notifPgMarkAll">Mark all as read</button>
+                </div>
+                <p class="notifpg-hint" style="margin:0;">Changes made by you and the HR team. Click a notification to open where it happened.</p>
+                <div class="notifpg-list" id="notifPgList">
+                    <div class="empty-state"><p>Loading notifications…</p></div>
+                </div>
+            </section>
+        `;
+    }
+
+    async function loadRealNotifications() {
+        try {
+            const result = await apiRequest('notifications');
+            notifications = result.notifications || [];
+            updateNotifCounts();
+            renderNotifications(document.querySelector('.notif-tabs button.active')?.dataset.tab || 'all');
+        } catch (err) {
+            console.warn('Could not load notifications:', err);
+        }
+    }
+
+    function renderNotifications(filter = 'all') {
+        const body = document.getElementById('notifBody');
+        if (!body) return;
+        const filtered = notifications.filter(n => {
+            if (filter === 'unread') return n.unread;
+            if (filter === 'alerts') return n.type === 'alert';
+            return true;
+        });
+        if (!filtered.length) {
+            body.innerHTML = `<div style="padding:40px;text-align:center;color:#888;">No notifications here.</div>`;
+            return;
+        }
+        body.innerHTML = filtered.map(n => `
+            <div class="notif-item ${n.unread ? 'unread' : ''}" data-notif-id="${n.id}" role="button" title="Go to ${escapeHtml(n.page || 'dashboard')}">
+                <div class="notif-icon ${n.color}">${n.icon}</div>
+                <div class="notif-content">
+                    <div class="notif-content-top">
+                        <h4>${escapeHtml(n.title)}</h4>
+                        ${n.unread ? '<div class="notif-unread-dot"></div>' : ''}
+                    </div>
+                    <p>${escapeHtml(n.desc)}</p>
+                    <small>${escapeHtml(n.time)}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function updateNotifCounts() {
+        const allCount = notifications.length;
+        const unreadCount = notifications.filter(n => n.unread).length;
+        const alertsCount = notifications.filter(n => n.type === 'alert').length;
+        const tAll = document.getElementById('tabAll');
+        const tUnread = document.getElementById('tabUnread');
+        const tAlerts = document.getElementById('tabAlerts');
+        if (tAll) tAll.textContent = `All (${allCount})`;
+        if (tUnread) tUnread.textContent = `Unread (${unreadCount})`;
+        if (tAlerts) tAlerts.textContent = `Alerts (${alertsCount})`;
+        const dot = document.getElementById('notifDot');
+        if (dot) dot.style.display = unreadCount > 0 ? 'block' : 'none';
+    }
+
+    window.markNotifRead = async function (id) {
+        const notif = notifications.find(n => n.id === id) || notifPageItems.find(n => n.id === id);
+        if (!notif || !notif.unread) return;
+        notif.unread = false;
+        updateNotifCounts();
+        renderNotifications(document.querySelector('.notif-tabs button.active')?.dataset.tab || 'all');
+        renderNotificationsPage();
+        try {
+            await apiRequest('notifications.markRead', {
+                method: 'POST',
+                body: JSON.stringify({ ids: [notif.logId] })
+            });
+        } catch (err) {
+            console.warn('Could not persist read state:', err);
+        }
+    };
+
+    async function markAllNotificationsRead() {
+        notifications.forEach(n => n.unread = false);
+        notifPageItems.forEach(n => n.unread = false);
+        updateNotifCounts();
+        renderNotifications(document.querySelector('.notif-tabs button.active')?.dataset.tab || 'all');
+        renderNotificationsPage();
+        try {
+            await apiRequest('notifications.markRead', {
+                method: 'POST',
+                body: JSON.stringify({ ids: [] })
+            });
+        } catch (err) {
+            console.warn('Could not persist read state:', err);
+        }
+    }
+
+    // Navigate the same way a sidebar click does. The Notifications page is
+    // deliberately not restored as the user's last page on the next login.
+    window.gotoHrPage = function (page) {
+        const target = canAccessPage(page) ? page : 'dashboard';
+        $$('.nav-item').forEach(link => link.classList.remove('active'));
+        const navItem = document.querySelector(`.nav-item[data-page="${target}"]`);
+        if (navItem) navItem.classList.add('active');
+        localStorage.setItem('devs_last_page', target === 'notifications' ? 'dashboard' : target);
+        renderPage(target);
+        popover?.classList.remove('open');
+    };
+
+    window.openHrNotif = function (id) {
+        const notif = notifications.find(n => n.id === id) || notifPageItems.find(n => n.id === id);
+        if (!notif) return;
+        if (notif.unread) void window.markNotifRead(id);
+        window.gotoHrPage(notif.page || 'dashboard');
+    };
+
+    async function loadNotificationsPage() {
+        const list = $('#notifPgList');
+        if (!list) return;
+        try {
+            const result = await fetch(`${API_URL}?action=notifications&limit=100`, { credentials: 'same-origin' })
+                .then(r => r.json());
+            if (result.ok === false) throw new Error(result.message || 'Could not load notifications.');
+            notifPageItems = result.notifications || [];
+        } catch (err) {
+            list.innerHTML = `<div class="empty-state"><p>${escapeHtml(err.message)}</p></div>`;
+            return;
+        }
+        renderNotificationsPage();
+        notifications = notifPageItems.slice(0, 20);
+        updateNotifCounts();
+    }
+
+    function renderNotificationsPage() {
+        const list = $('#notifPgList');
+        if (!list) return;
+        const unreadCount = notifPageItems.filter(n => n.unread).length;
+        const count = $('#notifPgCount');
+        if (count) count.textContent = `${notifPageItems.length} total · ${unreadCount} unread`;
+        if (!notifPageItems.length) {
+            list.innerHTML = `<div class="empty-state"><p>No notifications yet. Changes you and the team make will appear here.</p></div>`;
+            return;
+        }
+        list.innerHTML = notifPageItems.map(n => `
+            <div class="notif-item ${n.unread ? 'unread' : ''}" data-notif-id="${n.id}" role="button" title="Go to ${escapeHtml(n.page || 'dashboard')}">
+                <div class="notif-icon ${n.color}">${n.icon}</div>
+                <div class="notif-content">
+                    <div class="notif-content-top">
+                        <h4>${escapeHtml(n.title)}</h4>
+                        ${n.unread ? '<div class="notif-unread-dot"></div>' : ''}
+                    </div>
+                    <p>${escapeHtml(n.desc)}</p>
+                    <small>${escapeHtml(n.time)}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    if (bell && popover) {
+        document.getElementById('notifBody')?.addEventListener('click', (e) => {
+            const item = e.target.closest('.notif-item[data-notif-id]');
+            if (item) window.openHrNotif(item.dataset.notifId);
+        });
+        document.getElementById('notifViewAll')?.addEventListener('click', () => {
+            window.gotoHrPage('notifications');
+        });
+        bell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            popover.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (popover.classList.contains('open') && !popover.contains(e.target) && !bell.contains(e.target)) {
+                popover.classList.remove('open');
+            }
+        });
+        document.getElementById('notifCloseBtn')?.addEventListener('click', () => popover.classList.remove('open'));
+        document.getElementById('notifMarkRead')?.addEventListener('click', async () => {
+            await markAllNotificationsRead();
+            toast('All notifications marked as read.', 'success');
+        });
+        document.querySelectorAll('.notif-tabs button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.notif-tabs button').forEach(b => b.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                renderNotifications(e.currentTarget.dataset.tab);
+            });
+        });
+    }
+
+    window.loadRealNotifications = loadRealNotifications;
+    window.checkForNewNotifications = () => void loadRealNotifications();
+
+    // Refresh on login and every 30 seconds so the dot follows new changes.
+    setInterval(() => {
+        if (localStorage.getItem('devs_user')) void loadRealNotifications();
+    }, 30000);
 
     async function restoreSession() {
         try {

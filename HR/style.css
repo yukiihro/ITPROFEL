@@ -3606,6 +3606,12 @@ table.dashboard-preview-table tbody tr td:nth-child(3) {
     color: #a08a8a;
     margin-left: 7px;
 }
+.hr-donut-dept-count {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #a89090;
+    margin-left: 6px;
+}
 
 /* Department payroll breakdown modal (dashboard donut drill-down) */
 .pd-modal { padding: 4px 2px 2px; }
@@ -3734,6 +3740,30 @@ table.dashboard-preview-table tbody tr td:nth-child(3) {
 
 /* table-wrap scroll */
 .table-wrap { overflow-x: auto; }
+
+/* Employees Master List pagination on the HR dashboard */
+.hr-dash-pagination {
+    align-items: center;
+    margin: 0;
+    padding: 12px 20px;
+    border-top: 1px solid #f3e8e8;
+}
+.hr-dash-page-info {
+    margin-right: auto;
+    font-size: 12px;
+    color: #8a7a7a;
+}
+.hr-dash-pagination .coa-page-menu summary {
+    width: 130px;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 4px;
+}
+.hr-dash-pagination .coa-page-options {
+    top: 34px;
+    width: 130px;
+}
 
 /* Responsive */
 @media (max-width: 1100px) {
@@ -5356,6 +5386,86 @@ body {
 }
 .modal.modal-split.receivable-view-modal .view-emp-change:hover { color: #8f0f0c; }
 
+/* Deductions page — combined "N combined" tag in the Type column */
+.ded-combined-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 20px;
+    background: #fdeaea;
+    color: #c2181a;
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Deductions View modal — per-deduction breakdown */
+.modal.modal-split.receivable-view-modal.ded-view-modal { max-height: 88vh !important; }
+.modal.modal-split.receivable-view-modal.ded-view-modal .view-modal-right { overflow-y: auto !important; }
+
+.modal.modal-split.receivable-view-modal .ded-breakdown {
+    margin-top: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9a9a9a;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-item {
+    background: #fff;
+    border: 1px solid #f0dede;
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-type {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #111;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-amount {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #c2181a;
+    white-space: nowrap;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-reason {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #6b6b6b;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff0f0;
+    border: 1px solid #f3c9c9;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-total span {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7a0f0f;
+}
+.modal.modal-split.receivable-view-modal .ded-breakdown-total strong {
+    font-size: 16px;
+    font-weight: 800;
+    color: #c2181a;
+}
+
 /* ================================================================
    Add / Edit Employee modal — Finance "Add Account" split layout
    (red brand panel + pink form panel, ported from FINANCE voucher-modal)
@@ -6212,3 +6322,172 @@ tr.is-selected td { background: transparent !important; }
     flex-shrink: 0;
 }
 .gc-view-logo img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+
+/* ============================================================
+   NOTIFICATION SYSTEM (HR bell + dedicated page)
+   ============================================================ */
+.topbar-bell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+}
+.topbar-bell:hover { background: #fff; transform: translateY(-1px); }
+
+.notification-wrapper { position: relative; }
+
+.notification-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    background: #ff3b30;
+    border-radius: 50%;
+    border: 1px solid #fff;
+}
+
+.notif-popover {
+    position: absolute;
+    top: 55px;
+    right: -20px;
+    width: 420px;
+    background: #fef6f6;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    z-index: 9999 !important;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+}
+.notif-popover.open { display: flex; }
+
+.notif-header {
+    background: #fcebeb;
+    border-bottom: 1px solid #f3d6d6;
+    padding: 16px 20px 0;
+}
+.notif-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.notif-close {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+}
+.notif-title-row h3 { margin: 0; font-size: 18px; font-weight: 700; color: #333; }
+.notif-badge {
+    background: #b8141a;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 99px;
+}
+.notif-mark-read {
+    margin-left: auto;
+    font-size: 12px;
+    color: #b8141a;
+    font-weight: 600;
+    cursor: pointer;
+}
+.notif-tabs {
+    display: flex;
+    border-bottom: 2px solid #f0d0d0;
+}
+.notif-tabs button {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+.notif-tabs button.active { color: #b8141a; border-bottom-color: #b8141a; }
+.notif-body { max-height: 420px; overflow-y: auto; }
+
+.notif-item {
+    display: flex;
+    gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f3d6d6;
+    background: #fff;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+.notif-item:hover { background: #fdfafa; }
+.notif-item.unread { background: #fef6f6; }
+.notif-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+}
+.notif-icon.green { background: #4CAF50; }
+.notif-icon.orange { background: #FF9800; }
+.notif-icon.blue { background: #2196F3; }
+.notif-icon.red { background: #F44336; }
+.notif-icon.purple { background: #9C27B0; }
+.notif-content { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.notif-content-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.notif-content h4 { margin: 0; font-size: 13.5px; font-weight: 600; color: #222; line-height: 1.3; }
+.notif-unread-dot {
+    width: 8px;
+    height: 8px;
+    background: #F44336;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+}
+.notif-content p { margin: 0; font-size: 12.5px; color: #555; line-height: 1.4; }
+.notif-content small { font-size: 11px; color: #888; margin-top: 4px; }
+.notif-footer {
+    padding: 16px;
+    text-align: center;
+    background: #fcebeb;
+    color: #b8141a;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    border-top: 1px solid #f3d6d6;
+}
+.notifpg-count { color: #8a8f98; font-size: 13px; font-weight: 500; }
+.notifpg-hint { color: #8a8f98; font-size: 13px; }
+.notifpg-list {
+    margin-top: 14px;
+    border: 1px solid #f3d6d6;
+    border-radius: 12px;
+    overflow: hidden;
+    max-height: 68vh;
+}
+.notifpg-list .notif-item:last-child { border-bottom: none; }
+.notifpg-list .empty-state { padding: 32px; }
+
+@media print {
+    .notif-popover, .notification-wrapper { display: none !important; }
+}

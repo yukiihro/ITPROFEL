@@ -25,7 +25,7 @@ if (strcasecmp($dept, 'HR') !== 0) {
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>D.E.V.S · HR Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=20261119design3">
+    <link rel="stylesheet" href="style.css?v=20261120dashdept1">
 </head>
 <body>
 
@@ -173,9 +173,32 @@ if (strcasecmp($dept, 'HR') !== 0) {
                     </div>
                 </div>
                 <div class="topbar-right">
-                    <button type="button" class="topbar-bell" aria-label="Notifications">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-                    </button>
+                    <div class="notification-wrapper">
+                        <button type="button" class="topbar-bell" id="topbarBell" aria-label="Notifications">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                            </svg>
+                            <span class="notification-dot" id="notifDot" style="display:none;"></span>
+                        </button>
+                        <div class="notif-popover" id="notifPopover">
+                            <div class="notif-header">
+                                <div class="notif-title-row">
+                                    <button class="notif-close" id="notifCloseBtn" aria-label="Close notifications">✕</button>
+                                    <h3>Notifications</h3>
+                                    <span class="notif-badge">Up to date</span>
+                                    <span class="notif-mark-read" id="notifMarkRead">Mark all read</span>
+                                </div>
+                                <div class="notif-tabs">
+                                    <button class="active" data-tab="all" id="tabAll">All (0)</button>
+                                    <button data-tab="unread" id="tabUnread">Unread (0)</button>
+                                    <button data-tab="alerts" id="tabAlerts">Alerts (0)</button>
+                                </div>
+                            </div>
+                            <div class="notif-body" id="notifBody"></div>
+                            <button type="button" class="notif-footer" id="notifViewAll" style="width:100%;border:none;font-family:inherit;">View all notifications →</button>
+                        </div>
+                    </div>
                     <div class="topbar-user">
                         <div class="topbar-user-text">
                             <strong id="topbarName">HR User</strong>
@@ -202,6 +225,6 @@ if (strcasecmp($dept, 'HR') !== 0) {
 
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
-        <script src="functions.js?v=20261119search2" defer></script>
+        <script src="functions.js?v=20261120dashdept1" defer></script>
 </body>
 </html>

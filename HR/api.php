@@ -670,15 +670,27 @@ if ($action === 'state' && $method === 'POST') {
     if (!isHrAdmin($u)) {
         respond(['ok' => false, 'message' => 'Your role cannot modify HR records.'], 403);
     }
-    $state = requestBody()['state'] ?? null;
+    $body = requestBody();
+    $state = $body['state'] ?? null;
     if (!is_array($state)) respond(['ok' => false, 'message' => 'Invalid state payload.'], 422);
+
+    // Optional activity tag from the client (e.g. "leave:approved") so the
+    // notification feed can say what actually changed instead of just "store".
+    $activity = strtolower(trim((string)($body['auditActivity'] ?? '')));
+    $activity = preg_replace('/[^a-z0-9_:-]/', '', $activity) ?: '';
 
     // Safety: if the incoming state has empty arrays for destructive sections,
     // drop those keys so we never wipe real data by accident.
-    foreach (['employees', 'attendance', 'leaves', 'payroll', 'payroll_deductions'] as $key) {
+    foreach (['employees', 'attendance', 'leaves', 'payroll', 'deductions', 'payroll_deductions'] as $key) {
         if (array_key_exists($key, $state) && is_array($state[$key]) && count($state[$key]) === 0) {
             unset($state[$key]);
         }
+    }
+
+    // The client sends the Deductions page rows under `deductions`; they are
+    // stored in the payroll_deductions table. Accept either key.
+    if (!array_key_exists('payroll_deductions', $state) && array_key_exists('deductions', $state)) {
+        $state['payroll_deductions'] = $state['deductions'];
     }
 
     $pdo = db();
@@ -966,6 +978,42 @@ if ($action === 'state' && $method === 'POST') {
             }
         }
 
+        // Payroll deductions (SSS, PhilHealth, Pag-IBIG, cash advance, leave, …).
+        // Each row is linked to the employee's payroll run for the same period.
+        if (array_key_exists('payroll_deductions', $state) && !empty($state['payroll_deductions'])) {
+            $payrollByPeriod = $pdo->prepare(
+                'SELECT payroll_id FROM payroll WHERE employee_id = ? AND payroll_period = ?
+                 ORDER BY payroll_id DESC LIMIT 1'
+            );
+            $payrollLatest = $pdo->prepare(
+                'SELECT payroll_id FROM payroll WHERE employee_id = ?
+                 ORDER BY payroll_id DESC LIMIT 1'
+            );
+            $insDed = $pdo->prepare(
+                'INSERT INTO payroll_deductions (payroll_id, deduction_type, amount) VALUES (?, ?, ?)'
+            );
+            foreach ($state['payroll_deductions'] as $d) {
+                $empId  = (int)($d['empId'] ?? 0);
+                $amount = round((float)($d['amount'] ?? 0), 2);
+                $type   = trim((string)($d['type'] ?? $d['deduction_type'] ?? 'Other'));
+                if ($empId <= 0 || $amount <= 0 || $type === '') continue;
+
+                $period = (string)($d['period'] ?? $d['payroll_period'] ?? '');
+                $payrollId = false;
+                if ($period !== '') {
+                    $payrollByPeriod->execute([$empId, $period]);
+                    $payrollId = $payrollByPeriod->fetchColumn();
+                }
+                if ($payrollId === false || $payrollId === null) {
+                    $payrollLatest->execute([$empId]);
+                    $payrollId = $payrollLatest->fetchColumn();
+                }
+                if ($payrollId === false || $payrollId === null) continue;
+
+                $insDed->execute([(int)$payrollId, $type, $amount]);
+            }
+        }
+
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -977,7 +1025,14 @@ if ($action === 'state' && $method === 'POST') {
     if (!empty($state['attendance'])) $summary[] = count($state['attendance']) . ' attendance rows';
     if (!empty($state['leaves']))     $summary[] = count($state['leaves'])     . ' leave rows';
     if (!empty($state['payroll']))    $summary[] = count($state['payroll'])    . ' payroll rows';
-    audit((int)$u['id'], $u['email'], $u['role'], 'save', 'store', null,
+    $notifyModule = 'store';
+    $notifyAction = 'save';
+    if ($activity !== '') {
+        $parts = explode(':', $activity, 2);
+        $notifyModule = substr($parts[0], 0, 50);
+        $notifyAction = substr($parts[1] ?? 'updated', 0, 50);
+    }
+    audit((int)$u['id'], $u['email'], $u['role'], $notifyAction, $notifyModule, null,
           'Updated HR data: ' . implode(', ', $summary));
     respond(['ok' => true]);
 }
@@ -1332,6 +1387,133 @@ if ($action === 'audit' && $method === 'GET') {
          ORDER BY t.log_id DESC LIMIT 500"
     )->fetchAll();
     respond(['ok' => true, 'events' => $rows]);
+}
+
+// ---------- NOTIFICATIONS (HR) ----------
+// Same idea as Finance: the bell shows real data changes made by HR users.
+// Login/logout stay in the audit trail but never notify. Read state is stored
+// per user in notification_reads so it survives a refresh.
+if ($action === 'notifications' && $method === 'GET') {
+    $u = requireUser();
+    if (!isHrAdmin($u)) respond(['ok' => false, 'message' => 'Forbidden.'], 403);
+    $pdo = db();
+    $limit = max(1, min(100, (int)($_GET['limit'] ?? 20)));
+
+    $stmt = $pdo->prepare("
+        SELECT at.log_id AS id, at.timestamp AS at, at.action, at.module,
+               at.description, at.new_value AS actor, e.name AS actor_name,
+               nr.log_id IS NULL AS unread
+        FROM audit_trail at
+        INNER JOIN accounts a ON a.account_id = at.user_id
+        INNER JOIN employees e ON e.employee_id = a.employee_id
+        LEFT JOIN notification_reads nr ON nr.log_id = at.log_id AND nr.user_id = ?
+        WHERE e.department = 2
+          AND at.action NOT IN ('login', 'logout')
+        ORDER BY at.log_id DESC LIMIT $limit
+    ");
+    $stmt->execute([(int)$u['id']]);
+    $logs = $stmt->fetchAll();
+
+    $entityLabels = [
+        'leave'                => ['Leave',          '🌴', 'orange', 'leave'],
+        'attendance'           => ['Attendance',     '🕒', 'blue',   'attendance'],
+        'employee'             => ['Employee',       '👥', 'blue',   'employees'],
+        'payroll'              => ['Payroll',        '💼', 'green',  'payroll'],
+        'deduction'            => ['Deduction',      '💸', 'orange', 'deductions'],
+        'settings'             => ['HR Settings',    '⚙️', 'purple', 'settings'],
+        'store'                => ['HR Data',        '🗂️', 'blue',   'dashboard'],
+        'account'              => ['Account',        '👤', 'blue',   'accountManagement'],
+        'thirteenth_month_pay' => ['13th Month Pay', '🧧', 'green',  '13thmonth'],
+    ];
+    $changeLabels = [
+        'approved'        => 'Approved',
+        'rejected'        => 'Rejected',
+        'created'         => 'Created',
+        'added'           => 'Added',
+        'deleted'         => 'Deleted',
+        'updated'         => 'Updated',
+        'submitted'       => 'Submitted',
+        'saved'           => 'Saved',
+        'clock_in'        => 'Time-In Recorded',
+        'clock_out'       => 'Time-Out Recorded',
+        'request_leave'   => 'Requested',
+        'profile_update'  => 'Profile Updated',
+        'password_update' => 'Password Changed',
+        'reset_password'  => 'Password Reset',
+        'approve_user'    => 'Approved',
+        'reject_user'     => 'Rejected',
+        'set_status'      => 'Status Changed',
+        'save_access'     => 'Permissions Updated',
+        'save_access_bulk'=> 'Permissions Updated',
+        'thirteenth_month_save' => 'Saved',
+    ];
+    $goodChanges  = ['approved', 'created', 'added', 'saved', 'approve_user'];
+    $badChanges   = ['rejected', 'deleted', 'reject_user', 'reset_password'];
+    $warnChanges  = ['updated', 'submitted', 'clock_out', 'set_status', 'save_access', 'save_access_bulk', 'profile_update', 'password_update'];
+
+    $notifications = [];
+    foreach ($logs as $log) {
+        $actorParts = explode('|', (string)$log['actor']);
+        $email = $actorParts[0] ?? 'System';
+        $actor = trim((string)($log['actor_name'] ?? '')) ?: $email;
+
+        $module = strtolower(trim((string)$log['module']));
+        $action = strtolower(trim((string)$log['action']));
+        $bits = explode(':', $module, 2);
+        $entity = $bits[0];
+        $change = $bits[1] ?? $action;
+
+        $label = $entityLabels[$entity] ?? [ucfirst($entity ?: 'System'), '🔔', 'blue', 'dashboard'];
+        [$entityName, $icon, $color, $page] = $label;
+        $title = $entityName . ' ' . ($changeLabels[$change] ?? ($changeLabels[$action] ?? 'Updated'));
+        if (in_array($change, $goodChanges, true)) $color = 'green';
+        elseif (in_array($change, $badChanges, true)) $color = 'red';
+        elseif (in_array($change, $warnChanges, true)) $color = 'orange';
+
+        $desc = trim((string)$log['description']) ?: ('Changed ' . ($entity ?: 'record'));
+        $desc .= ' — by ' . $actor;
+
+        $notifications[] = [
+            'id'     => 'n-' . $log['id'],
+            'logId'  => (int)$log['id'],
+            'title'  => $title,
+            'desc'   => $desc,
+            'time'   => date('M d, H:i', strtotime((string)$log['at'])),
+            'icon'   => $icon,
+            'color'  => $color,
+            'unread' => (bool)$log['unread'],
+            'page'   => $page,
+            'type'   => $color === 'red' ? 'alert' : 'info',
+        ];
+    }
+    respond(['ok' => true, 'notifications' => $notifications]);
+}
+
+// ---------- MARK NOTIFICATIONS READ ----------
+if ($action === 'notifications.markRead' && $method === 'POST') {
+    $u = requireUser();
+    if (!isHrAdmin($u)) respond(['ok' => false, 'message' => 'Forbidden.'], 403);
+    $ids = requestBody()['ids'] ?? null;
+    $ids = is_array($ids) ? array_values(array_filter(array_map('intval', $ids))) : [];
+
+    $pdo = db();
+    if ($ids) {
+        $stmt = $pdo->prepare('INSERT IGNORE INTO notification_reads (user_id, log_id) VALUES (?, ?)');
+        foreach ($ids as $logId) {
+            if ($logId > 0) $stmt->execute([(int)$u['id'], $logId]);
+        }
+    } else {
+        $pdo->prepare("
+            INSERT IGNORE INTO notification_reads (user_id, log_id)
+            SELECT ?, at.log_id
+            FROM audit_trail at
+            INNER JOIN accounts a ON a.account_id = at.user_id
+            INNER JOIN employees e ON e.employee_id = a.employee_id
+            WHERE e.department = 2
+              AND at.action NOT IN ('login', 'logout')
+        ")->execute([(int)$u['id']]);
+    }
+    respond(['ok' => true]);
 }
 
 // ---------- PAGE ACCESS ----------

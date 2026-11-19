@@ -438,9 +438,11 @@ document.addEventListener('DOMContentLoaded', () => {
         advanced.hidden=missing.length===0;
         advanced.open=missing.length>0;
         $('discEditForm').querySelector('.disc-description').textContent='The verified GR quantities, PO prices, and saved dates are already loaded. Enter the real supplier document reference, confirm you reviewed it, then save and verify.';
-        $('discEditFeedback').textContent=missing.length
-          ? 'Some saved invoice details are missing. Complete the visible details from the genuine supplier document before verifying.'
-          : 'Review the genuine supplier invoice against the verified receipt above. Do not tick the checkbox unless you actually checked the document.';
+        $('discEditFeedback').textContent=d.invoice.legacy_invoice===true
+          ? 'Existing '+d.invoice.invoice_number+' will be updated IN PLACE (no duplicate). Enter the actual supplier-issued reference, compare the amounts with that document, and confirm only if you personally reviewed it.'
+          : (missing.length
+            ? 'Some saved invoice details are missing. Complete the visible details from the genuine supplier document before verifying.'
+            : 'Review the genuine supplier invoice against the verified receipt above. Do not tick the checkbox unless you actually checked the document.');
       } else {
         advanced.hidden=false;
         $('discEditFeedback').textContent='Check the supplier-issued invoice number and the genuine supplier document. Final numerical matching uses the original verified Goods Receipt.';
@@ -614,8 +616,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.success)throw new Error(d.message||'Cannot load invoice for editing.');
-    if(!d.invoice || d.invoice.invoice_number!==number || d.invoice.source_kind!=='supplier_document')
-      throw new Error('Invoice does not match this unposted genuine supplier document.');
+    // A verified GR can precede buyer_invoice_source_local on older imported invoices.
+    // The PHP lookup explicitly marks a single eligible legacy invoice and will
+    // UPDATE that same invoice ID only after a real supplier document is reviewed.
+    if(!d.invoice || d.invoice.invoice_number!==number ||
+       (d.invoice.source_kind!=='supplier_document' && d.invoice.legacy_invoice!==true))
+      throw new Error('This invoice has no editable genuine supplier-document record. Check its source and status in Record Invoice; no duplicate should be created.');
     return d;
   }
   async function invoicePost(body) {
@@ -660,7 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const td=document.createElement('td');td.textContent=s;tr.append(td);
       }
       for(const [className,value] of [
-        ['disc-qty',old?.qty_billed??''],['disc-price',old?.unit_price??line.unit_price]]) {
+        ['disc-qty',old?.qty_billed??gr?.real_gr_accepted??''],['disc-price',old?.unit_price??line.unit_price]]) {
         const td=document.createElement('td'),input=document.createElement('input');
         input.type='number';input.step='0.01';input.min=className==='disc-mail-rejected'?'0':'0.01';input.required=true;
         input.className=className;input.value=String(value);input.readOnly=true;input.title='Automatically calculated from Inventory Gmail accepted quantity and approved PO price';input.addEventListener('input',recompute);

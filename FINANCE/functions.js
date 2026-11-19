@@ -2567,6 +2567,17 @@ document.addEventListener('DOMContentLoaded', () => {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
                         </button>
                         <ul class="custom-filter-menu">
+                            <li data-value="Money In">Money In</li>
+                            <li data-value="Money Out">Money Out</li>
+                        </ul>
+                    </div>
+
+                    <div class="custom-filter-dropdown" data-id="txCategory">
+                        <button type="button" class="custom-filter-btn" data-value="" data-default-text="Category">
+                            <span class="cfb-text">Category</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <ul class="custom-filter-menu">
                             <li data-value="Accounts Payable">Accounts Payable</li>
                         </ul>
                     </div>
@@ -2577,8 +2588,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
                         </button>
                         <ul class="custom-filter-menu">
-                            <li data-value="Money In">Money In</li>
-                            <li data-value="Money Out">Money Out</li>
+                            <li data-value="Completed">Completed</li>
+                            <li data-value="Approved">Approved</li>
+                            <li data-value="Pending">Pending</li>
+                            <li data-value="Failed">Failed</li>
                         </ul>
                     </div>
                              <div class="fin-tx-actions">
@@ -2622,6 +2635,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
                         <input type="search" id="prSearch" placeholder="Search..." />
                     </label>
+                    <div class="custom-filter-dropdown" data-id="prDept">
+                        <button type="button" class="custom-filter-btn" data-value="" data-default-text="Department">
+                            <span class="cfb-text">Department</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <ul class="custom-filter-menu" id="prDeptOptions"></ul>
+                    </div>
                     <div class="custom-filter-dropdown" data-id="prStatus">
                         <button type="button" class="custom-filter-btn" data-value="" data-default-text="Status">
                             <span class="cfb-text">Status</span>
@@ -2811,7 +2831,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Read from custom dropdown buttons
         const source = $('.custom-filter-dropdown[data-id="txSource"] .custom-filter-btn')?.dataset.value || '';
         const type   = $('.custom-filter-dropdown[data-id="txType"] .custom-filter-btn')?.dataset.value || '';
-        const flowFilter = $('.custom-filter-dropdown[data-id="txStatus"] .custom-filter-btn')?.dataset.value || '';
+        const category = $('.custom-filter-dropdown[data-id="txCategory"] .custom-filter-btn')?.dataset.value || '';
+        const statusFilter = $('.custom-filter-dropdown[data-id="txStatus"] .custom-filter-btn')?.dataset.value || '';
 
         // Money In entries: Sales ledger rows are already part of the record;
         // Sales collections that only exist in payment_transactions (never
@@ -2845,12 +2866,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // rename, so both spellings must match the filters.
             const matchS = !source || r.source === source
                 || (source === 'Procurement' && r.source === 'Procure');
-            const matchT = !type   || r.description === type
-                || (type === 'Accounts Payable' && r.description === 'Supplier Pay');
-            // The Status dropdown filters by direction: Money In vs Money Out.
-            const matchSt = !flowFilter
-                || (flowFilter === 'Money In' ? isMoneyInRow(r) : !isMoneyInRow(r));
-            return matchQ && matchS && matchT && matchSt;
+            // Type matches the table's Type column: Money In / Money Out.
+            const matchT = !type
+                || (type === 'Money In' ? isMoneyInRow(r) : !isMoneyInRow(r));
+            // Category keeps the old Accounts Payable description filter.
+            const matchCategory = !category || r.description === category
+                || (category === 'Accounts Payable' && r.description === 'Supplier Pay');
+            // Status filters the real transaction status shown in the table.
+            const matchSt = !statusFilter || String(r.status || '') === statusFilter;
+            return matchQ && matchS && matchT && matchCategory && matchSt;
         }).sort((a, b) =>
             String(b.date || '').localeCompare(String(a.date || ''))
             || String(b.id).localeCompare(String(a.id), undefined, { numeric: true }));
@@ -2907,10 +2931,39 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await apiRequest('payroll_records');
             payrollRecords = Array.isArray(res?.payroll) ? res.payroll : [];
+            populatePayrollDepartments();
         } catch (err) {
             console.warn('HR payroll records could not be loaded:', err);
         } finally {
             payrollRecordsLoading = false;
+        }
+    }
+
+    // Department options come from the HR payroll rows themselves, so the
+    // filter always matches the departments actually shown in the table.
+    function populatePayrollDepartments() {
+        const menu = document.getElementById('prDeptOptions');
+        if (!menu) return;
+        const btn = document.querySelector('.custom-filter-dropdown[data-id="prDept"] .custom-filter-btn');
+        const selected = btn?.dataset.value || '';
+        const depts = [...new Set(payrollRecords
+            .map(r => String(r.department || '').trim())
+            .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        // Keep the auto-injected "All Department" option if the menu was opened.
+        const allOption = menu.querySelector('li[data-value="__all__"]');
+        menu.innerHTML = '';
+        if (allOption) menu.appendChild(allOption);
+        depts.forEach(dept => {
+            const li = document.createElement('li');
+            li.dataset.value = dept;
+            li.textContent = dept;
+            menu.appendChild(li);
+        });
+        if (selected && !depts.includes(selected)) {
+            btn.dataset.value = '';
+            const label = btn.querySelector('.cfb-text');
+            if (label) label.textContent = 'Department';
+            btn.classList.remove('is-active');
         }
     }
 
@@ -2929,14 +2982,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!tbody) return;
 
         const q      = ($('#prSearch')?.value || '').trim().toLowerCase();
+        const dept   = $('.custom-filter-dropdown[data-id="prDept"] .custom-filter-btn')?.dataset.value || '';
         const status = $('.custom-filter-dropdown[data-id="prStatus"] .custom-filter-btn')?.dataset.value || '';
 
         const rows = payrollRecords
             .filter(r => {
                 const text = `${r.id} ${r.employee} ${r.department} ${r.period}`.toLowerCase();
                 const matchQ = !q || text.includes(q);
+                const matchDept = !dept || String(r.department || '').trim() === dept;
                 const matchSt = !status || (status === 'Paid' ? r.paid : !r.paid);
-                return matchQ && matchSt;
+                return matchQ && matchDept && matchSt;
             })
             .sort((a, b) => Number(b.id) - Number(a.id));
 

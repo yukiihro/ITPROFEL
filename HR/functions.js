@@ -474,7 +474,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const q = ($('#leaveSearch')?.value || '').trim().toLowerCase();
             const statuses = leaveStatusSelection();
             const keep = new Set(store.leaves.filter(l => {
-                const text = `${recordEmployeeName(l)} ${l.reason || ''} ${l.type || ''} ${l.id || ''}`.toLowerCase();
+                const emp = empById(l.empId);
+                const text = idSearchText(recordEmployeeName(l), l.empId, emp?.id, emp?.empNo, l.id, l.reason, l.type, l.status);
                 return (!q || text.includes(q)) && (!statuses.length || statuses.includes(l.status));
             }).map(l => l.id));
             return data.rows.filter((row, index) => keep.has(store.leaves[index]?.id));
@@ -902,6 +903,35 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     function empById(id) { return store.employees.find(e => String(e.id) === String(id)); }
     function recordEmployeeName(record) { return empById(record.empId)?.name || record.employeeName || record.empId; }
+
+    /* Every HR search bar matches IDs in every form the pages display:
+       plain (26), zero-padded (00026 / 026) and EMP- prefixed (EMP-026).
+       Passing a value through here also covers the employee's empNo. */
+    function idSearchText(...values) {
+        const parts = [];
+        values.forEach(value => {
+            if (value === null || value === undefined) return;
+            const raw = String(value).trim();
+            if (!raw) return;
+            parts.push(raw);
+            const digits = raw.replace(/^emp[-\s]*/i, '');
+            if (/^\d+$/.test(digits)) {
+                parts.push(
+                    String(Number(digits)),
+                    digits.padStart(5, '0'),
+                    digits.padStart(3, '0'),
+                    `emp-${String(Number(digits))}`,
+                    `emp-${digits.padStart(3, '0')}`,
+                    `pay-${String(Number(digits))}`,
+                    `pay-${digits.padStart(4, '0')}`
+                );
+            }
+        });
+        return parts.join(' ').toLowerCase();
+    }
+    function matchesSearch(q, ...values) {
+        return !q || idSearchText(...values).includes(String(q).trim().toLowerCase());
+    }
     applyLeavePayrollRule();
 
     const pillClass = (status) => {
@@ -1357,7 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!tbody) return;
         const q = ($('#hrDashEmpSearch')?.value || '').trim().toLowerCase();
         const rows = store.employees.filter(e =>
-            !q || `${e.id} ${e.name} ${e.dept} ${e.position || ''}`.toLowerCase().includes(q)
+            matchesSearch(q, e.id, e.empNo, e.name, e.dept, e.position)
         );
         tbody.innerHTML = rows.map(e => {
             const st = (e.status || 'Active');
@@ -1442,7 +1472,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function visibleEmployees() {
         const { q, status } = employeeFilterState();
         return store.employees.filter(e => {
-            const matchesQ = !q || `${e.name} ${e.id} ${e.position || 'Staff'} ${e.email || ''}`.toLowerCase().includes(q);
+            const matchesQ = matchesSearch(q, e.name, e.id, e.empNo, e.position, e.email, e.dept);
             const matchesS = !status || e.status === status;
             return matchesQ && matchesS;
         });
@@ -1651,7 +1681,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function visibleAttendance() {
         const { q, date, status } = attendanceFilterState();
         return store.attendance.filter(a => {
-            const employeeText = `${recordEmployeeName(a)} ${a.empId}`.toLowerCase();
+            const emp = empById(a.empId);
+            const employeeText = idSearchText(recordEmployeeName(a), a.empId, emp?.id, emp?.empNo, a.date, a.status);
             const matchQ = !q || employeeText.includes(q);
             const matchD = !date || a.date === date;
             const matchS = !status || a.status === status;
@@ -1919,7 +1950,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const q = ($('#leaveSearch')?.value || '').trim().toLowerCase();
         const statuses = leaveStatusSelection();
         const matches = (l, term) => {
-            const text = `${recordEmployeeName(l)} ${l.reason || ''} ${l.type || ''} ${l.id || ''}`.toLowerCase();
+            const emp = empById(l.empId);
+            const text = idSearchText(recordEmployeeName(l), l.empId, emp?.id, emp?.empNo, l.id, l.reason, l.type, l.status);
             return !term || text.includes(term);
         };
 
@@ -2127,7 +2159,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = payrollStatusSelection();
         return store.payroll.filter(p => {
             const emp = empById(p.empId);
-            const text = `${p.id} ${p.cycle} ${emp ? emp.name : ''} ${p.empId}`.toLowerCase();
+            const text = idSearchText(p.id, p.empId, emp?.id, emp?.empNo, emp?.name || '', p.cycle, p.payroll_period, p.status);
             const matchQ = !q || text.includes(q);
             const matchS = !status || p.status === status;
             return matchQ && matchS;
@@ -2277,7 +2309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const emp = empById(p.empId);
             const name = emp ? emp.name : p.empId;
             const cycle = p.payroll_period || p.cycle || '';
-            const matchQ = !q || `${name} ${p.empId} ${cycle}`.toLowerCase().includes(q);
+            const matchQ = matchesSearch(q, name, p.empId, emp?.id, emp?.empNo, p.id, cycle, p.status);
             const matchY = !yr || String(cycle).includes(yr);
             const matchP = !pr || cycle === pr;
             const matchS = !st || String(p.status).toLowerCase() === st.toLowerCase();
@@ -2545,7 +2577,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const role = $('#amRole')?.value || '';
         const status = $('#amStatus')?.value || '';
         const rows = amUserCache.filter(u => {
-            const matchQ = !q || `${u.fullName || ''} ${u.email || ''} ${u.id || ''} ${u.employeeId || ''}`.toLowerCase().includes(q);
+            const matchQ = matchesSearch(q, u.fullName, u.email, u.id, u.employeeId, u.username);
             const matchD = !dept   || u.department === dept;
             const matchR = !role   || u.position === role;
             const matchS = !status || u.status === status;
@@ -2697,7 +2729,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dept = contributionAgencyFilter();
         return store.contributions.filter(c => {
             const matchType = contributionTypeKey(c.type) === contribActiveTab;
-            const text = `${c.empNo || ''} ${c.employeeName || ''} ${c.empId || ''} ${c.period || ''}`.toLowerCase();
+            const text = idSearchText(c.empNo, c.empId, c.employeeName, c.period, c.status);
             const matchQ = !q || text.includes(q);
             const matchD = !dept || c.dept === dept;
             return matchType && matchQ && matchD;
@@ -3066,7 +3098,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function tmVisibleRows() {
         const q = ($('#tmSearch')?.value || '').trim().toLowerCase();
         return store.employees.filter(e =>
-            !q || `${e.name || ''} ${e.id || ''} ${e.empNo || ''} ${e.dept || ''}`.toLowerCase().includes(q));
+            matchesSearch(q, e.name, e.id, e.empNo, e.dept, e.status));
     }
 
     function build13thMonth() {
@@ -3452,7 +3484,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = $('#dedStatus')?.value || '';
         const rows = store.deductions.filter(d => {
             const emp = empById(d.empId);
-            const text = `${emp ? emp.name : ''} ${d.type}`.toLowerCase();
+            const text = idSearchText(d.id, d.empId, emp?.id, emp?.empNo, emp?.name || '', d.type, d.period, d.status);
             return (!q || text.includes(q)) && (!type || d.type === type) && (!status || d.status === status);
         });
         const countEl = $('#dedCount');
@@ -3629,7 +3661,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const events = result.events || [];
             const q = ($('#atSearch')?.value || '').trim().toLowerCase();
             const rows = events.filter(e => {
-                const text = `${e.actor || ''} ${e.action || ''} ${e.entity || ''} ${e.entityId || ''} ${e.details || ''}`.toLowerCase();
+                const text = idSearchText(e.actor, e.action, e.entity, e.entityId, e.details, e.at);
                 const matchQ = !q || text.includes(q);
                 const dateOnly = String(e.at || '').slice(0, 10);
                 return matchQ && (!atDateFrom || dateOnly >= atDateFrom) && (!atDateTo || dateOnly <= atDateTo);
@@ -4160,7 +4192,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const dept = $('#amDept')?.value || '';
                     const role = $('#amRole')?.value || '';
                     const status = $('#amStatus')?.value || '';
-                    const matchQ = !q || `${u.fullName || ''} ${u.email || ''} ${u.id || ''} ${u.employeeId || ''}`.toLowerCase().includes(q);
+                    const matchQ = matchesSearch(q, u.fullName, u.email, u.id, u.employeeId, u.username);
                     const matchD = !dept   || u.department === dept;
                     const matchR = !role   || u.position === role;
                     const matchS = !status || u.status === status;

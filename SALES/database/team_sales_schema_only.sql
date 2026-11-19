@@ -70,7 +70,7 @@ CREATE TABLE `collections` (
   `collection_date` date NOT NULL,
   `due_date` date DEFAULT NULL,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `method` enum('Cash','GCash','Bank Transfer','Cash on Delivery','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'Cash',
+  `method` enum('Cash','GCash','Bank Transfer','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'Cash',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -174,9 +174,9 @@ CREATE TABLE `demo_payment_attempts` (
   `invoice_id` int(10) UNSIGNED NOT NULL,
   `order_id` int(10) UNSIGNED NOT NULL,
   `customer_id` int(10) UNSIGNED NOT NULL,
-  `method` enum('Cash on Delivery','Debit','Credit','GCash') NOT NULL,
+  `method` enum('Debit','Credit','GCash') NOT NULL,
   `amount` decimal(12,2) NOT NULL,
-  `status` enum('Pending','Simulated Paid','Simulated Failed','COD Due','COD Collected (Simulated)') NOT NULL,
+  `status` enum('Pending','Simulated Paid','Simulated Failed') NOT NULL,
   `simulated_auth_code` varchar(40) DEFAULT NULL,
   `completed_at` datetime DEFAULT NULL,
   `completed_by` int(10) UNSIGNED DEFAULT NULL,
@@ -362,7 +362,7 @@ CREATE TABLE `sales_orders` (
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Pending','Processing','Invoiced','Completed','Cancelled','Returned') NOT NULL DEFAULT 'Pending',
   `admin_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-  `payment_method` enum('GCash','Bank Transfer','Cash on Delivery','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'Cash on Delivery',
+  `payment_method` enum('GCash','Bank Transfer','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'GCash',
   `payment_status` enum('Pending','Partially Paid','Paid','Failed') NOT NULL DEFAULT 'Pending',
   `payment_reference` varchar(100) DEFAULT NULL,
   `receipt_no` varchar(30) DEFAULT NULL,
@@ -397,7 +397,7 @@ CREATE TABLE `sales_quotations` (
   `shipping_fee` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Pending','Approved','Rejected','Expired') NOT NULL DEFAULT 'Pending',
   `admin_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-  `payment_method` enum('GCash','Bank Transfer','Cash on Delivery','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'Cash on Delivery',
+  `payment_method` enum('GCash','Bank Transfer','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'GCash',
   `payment_status` enum('Pending','Partially Paid','Paid','Failed') NOT NULL DEFAULT 'Pending',
   `payment_reference` varchar(100) DEFAULT NULL,
   `receipt_no` varchar(30) DEFAULT NULL,

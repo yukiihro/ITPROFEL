@@ -31,7 +31,7 @@ if ($action === 'session' && $method === 'GET') {
     $user = $_SESSION['user'] ?? null;
     if (is_array($user)) {
         $user = array_intersect_key($user, array_flip([
-            'id', 'user_id', 'name', 'full_name', 'username', 'department', 'position', 'role', 'status',
+            'id', 'user_id', 'name', 'full_name', 'fullName', 'username', 'department', 'position', 'role', 'status',
         ]));
     }
     session_write_close();
@@ -58,7 +58,7 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        SELECT user_id, full_name, username, password, role, status
+        SELECT user_id, full_name, username, password, role, status, avatar_path
         FROM users
         WHERE username = ?
           AND role IN ('Sales Admin', 'Sales Staff')
@@ -85,7 +85,10 @@ if (!session_regenerate_id(true)) {
     respond(['ok' => false, 'message' => 'Could not secure the sign-in session. Please try again.'], 500);
 }
 
-$fullName = (string)$user['full_name'];
+$fullName = trim((string)$user['full_name']);
+if ($fullName === '') {
+    $fullName = (string)$user['username'];
+}
 $_SESSION['user'] = [
     'id' => (string)$user['user_id'],
     'user_id' => (int)$user['user_id'],
@@ -96,6 +99,7 @@ $_SESSION['user'] = [
     'position' => (string)$user['role'],
     'role' => (string)$user['role'],
     'status' => (string)($user['status'] ?? 'Active'),
+    'avatar_path' => (string)($user['avatar_path'] ?? ''),
 ];
 $_SESSION['sales_session_established'] = true;
 

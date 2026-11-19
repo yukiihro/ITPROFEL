@@ -13,10 +13,17 @@ $page = max(1, min((int)($_GET['page'] ?? 1), $totalPages));
 $activityStmt = $pdo->prepare("
     SELECT a.action, a.module, a.description, a.created_at,
            CASE WHEN a.user_id = 0 THEN 'System'
-                ELSE COALESCE(NULLIF(u.full_name, ''), u.username, CONCAT('User #', a.user_id))
+                ELSE COALESCE(
+                    NULLIF(u.full_name, ''),
+                    CASE WHEN u.user_id IS NULL THEN NULLIF(shared_employee.name, '') END,
+                    u.username,
+                    CONCAT('User #', a.user_id)
+                )
            END AS user_name
     FROM activity_logs a
     LEFT JOIN users u ON u.user_id = a.user_id
+    LEFT JOIN finance_hr.accounts shared_account ON shared_account.account_id = a.user_id
+    LEFT JOIN finance_hr.employees shared_employee ON shared_employee.employee_id = shared_account.employee_id
     ORDER BY a.created_at DESC, a.log_id DESC
     LIMIT :limit OFFSET :offset
 ");

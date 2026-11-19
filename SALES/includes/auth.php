@@ -17,7 +17,7 @@ function requireLogin(): void {
     $role = is_array($user) ? (string)($user['role'] ?? '') : '';
     $department = is_array($user) ? strtolower(trim((string)($user['department'] ?? ''))) : '';
     if ($department !== 'sales' || !in_array($role, ['Sales Admin', 'Sales Staff'], true)) {
-        header('Location: ../root/index.php');
+        header('Location: ../root/index.php', true, 302);
         exit;
     }
     if (empty($_SESSION['sales_session_established'])) {
@@ -56,19 +56,15 @@ function requireCustomer(): void {
 function requireSalesAdmin(): void {
     requireLogin();
     if (currentUser()['role'] !== 'Sales Admin') {
-        header('Location: ../root/index.php');
+        header('Location: ../root/index.php', true, 302);
         exit;
     }
 }
 
 function requireSalesWorkspace(): void {
     requireLogin();
-    // The universal HR login provisions a single Sales account whose session
-    // role is "Sales Admin", so the workspace must admit both Sales roles
-    // (the Sales dashboard does the same). Only the admin_* pages stay
-    // Sales-Admin-exclusive via requireSalesAdmin().
-    if (!in_array(currentUser()['role'], ['Sales Admin', 'Sales Staff'], true)) {
-        header('Location: ../root/index.php');
+    if (currentUser()['role'] !== 'Sales Staff') {
+        header('Location: ../root/index.php', true, 302);
         exit;
     }
 }

@@ -3,7 +3,7 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
 requireLogin();
-if (!in_array(currentUser()['role'] ?? '', ['Sales Admin','Sales Staff'], true)) { header('Location: ../root/index.php'); exit; }
+if (!in_array(currentUser()['role'] ?? '', ['Sales Admin','Sales Staff'], true)) { header('Location: ../root/index.php', true, 302); exit; }
 $pdo = getDB();
 $openQuotations = (int)$pdo->query("SELECT COUNT(*) FROM sales_quotations WHERE admin_status='Pending'")->fetchColumn();
 $requests = (int)$pdo->query("SELECT COUNT(*) FROM customer_order_requests WHERE status='Pending Quotation'")->fetchColumn();

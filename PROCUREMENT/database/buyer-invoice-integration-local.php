@@ -69,13 +69,52 @@ function ilReceiptNumbers(mysqli $db,int $poId,string $poNumber): array {
 // stored in MySQL, but must not be loaded/edited as the active supplier invoice.
 // The existing PO row lock serializes genuine invoice creation for each PO.
 // UNIPROCUR_DEFENSE_REFERENCE_V8 — demo records are NEVER reclassified as genuine invoices.
+// UNIPROCUR_EXISTING_INVOICE_REPAIR_V23: reuse ONE genuine-metadata-missing legacy
+// invoice from the SAME Buyer and PO. Never generate a second genuine invoice
+// merely because an old row has no buyer_invoice_source_local record.
+function ilLegacyInvoice(mysqli $db,int $poId,int $buyerId): ?array {
+    $q=$db->prepare('SELECT i.*,po.supplier_id AS expected_supplier_id,
+        (SELECT COUNT(*) FROM procurement_finance_invoice_handoffs h WHERE h.invoice_id=i.id) AS finance_handoff_count
+        FROM invoices i
+        JOIN purchase_orders po ON po.id=i.po_id
+        LEFT JOIN buyer_invoice_source_local src ON src.invoice_id=i.id
+        WHERE i.po_id=? AND i.created_by=? AND src.invoice_id IS NULL
+        ORDER BY i.id DESC LIMIT 2');
+    $q->bind_param('ii',$poId,$buyerId);$q->execute();
+    $rows=$q->get_result()->fetch_all(MYSQLI_ASSOC);$q->close();
+    if (!$rows) return null;
+    if (count($rows)!==1) throw new DomainException('Multiple existing invoices without source records were found for this PO. Manual review required; no new invoice will be created.');
+    $v=$rows[0];
+    if ((int)$v['supplier_id']!==(int)$v['expected_supplier_id'])
+        throw new DomainException('Existing invoice supplier differs from the approved Purchase Order. Manual reconciliation required.');
+    if ((int)$v['finance_handoff_count']!==0)
+        throw new DomainException('This existing invoice already has a Finance handoff and cannot be modified.');
+    if (!in_array(strtolower((string)$v['status']),['pending_match','discrepancy'],true))
+        throw new DomainException('Existing invoice is already locked or posted. It cannot be edited or duplicated.');
+    if (preg_match('/\A(?:DEMO|SIM)[-_]/i',(string)$v['invoice_number']))
+        throw new DomainException('A simulated invoice must not be converted into a genuine supplier invoice.');
+    unset($v['expected_supplier_id'],$v['finance_handoff_count']);
+    $v['supplier_invoice_reference']=null;
+    $v['source_kind']=null;
+    $v['document_checked']=0;
+    $v['source_notes']=null;
+    $v['match_status']='unverified';
+    $v['match_summary']='Existing invoice awaits genuine supplier-document review.';
+    $v['verified_at']=null;
+    $v['legacy_invoice']=true;
+    return $v;
+}
 function ilInvoice(mysqli $db,int $poId, int $buyerId, string $mode="genuine"): ?array {
     $sourceKind=$mode==="simulated" ? "demo" : "supplier_document";
     $q=$db->prepare('SELECT i.*,src.supplier_invoice_reference,src.source_kind,src.document_checked,
         src.source_notes,src.match_status,src.match_summary,src.verified_at
         FROM invoices i LEFT JOIN buyer_invoice_source_local src ON src.invoice_id=i.id
         WHERE i.po_id=? AND i.created_by=? AND src.source_kind=? AND (?=\'supplier_document\' OR src.source_notes LIKE \'DEFENSE_SIM_V8:%\') ORDER BY i.id DESC LIMIT 1');
-    $q->bind_param('iiss',$poId,$buyerId,$sourceKind,$sourceKind);$q->execute();$v=$q->get_result()->fetch_assoc();$q->close();return $v?:null;
+    $q->bind_param('iiss',$poId,$buyerId,$sourceKind,$sourceKind);
+    $q->execute();$v=$q->get_result()->fetch_assoc();$q->close();
+    if($v) {$v['legacy_invoice']=false;return $v;}
+    if($mode==='genuine') return ilLegacyInvoice($db,$poId,$buyerId);
+    return null;
 }
 function ilInvoiceLines(mysqli $db,int $invoiceId): array {
     $q=$db->prepare('SELECT id,po_item_id,item_name,unit,qty_billed,unit_price,subtotal FROM invoice_items WHERE invoice_id=? ORDER BY id');

@@ -252,13 +252,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const store = loadStore();
 
+    /* AP and AR records are expenses too: they use the same voucher table,
+       breakdown and totals as ordinary expense vouchers. The source flag keeps
+       voucher editing/deleting limited to real rows in store.expenses. */
+    function apArExpenseRows() {
+        const payableRows = (store.payables || []).map(p => ({
+            id: `AP-${p.id}`,
+            voucher: p.invoice || `AP-${p.id}`,
+            category: 'Accounts Payable',
+            description: `Accounts Payable · ${p.invoice || p.id}${p.vendor ? ` · ${p.vendor}` : ''}`,
+            date: p.due || '',
+            supplier: p.vendor || '',
+            vendor: p.vendor || '',
+            amount: Number(p.amount || 0),
+            status: payableStatus(p),
+            paymentMethod: 'Accounts Payable',
+            reference: p.invoice || '',
+            isApAr: true,
+            sourceType: 'payable'
+        }));
+        const receivableRows = (store.receivables || []).map(r => ({
+            id: `AR-${r.id}`,
+            voucher: r.invoice || `AR-${r.id}`,
+            category: 'Accounts Receivable',
+            description: `Accounts Receivable · ${r.invoice || r.id}${r.customer ? ` · ${r.customer}` : ''}`,
+            date: r.due || r.invoiceDate || '',
+            supplier: r.customer || '',
+            vendor: r.customer || '',
+            amount: Number(r.amount || 0),
+            status: receivableStatus(r),
+            paymentMethod: 'Accounts Receivable',
+            reference: r.invoice || '',
+            isApAr: true,
+            sourceType: 'receivable'
+        }));
+        return [...payableRows, ...receivableRows];
+    }
+    function allExpenseRows() {
+        return [...(store.expenses || []), ...apArExpenseRows()];
+    }
+
     /* Single source of truth for totals: the dashboard reads the same figures
        each module shows, so the numbers cannot drift apart. */
     const sumAmount = (rows, pick) => (rows || []).reduce(
         (sum, row) => sum + Number((pick ? pick(row) : row.amount) || 0), 0);
     const financeTotals = {
         revenue:     () => sumAmount((store.accounts || []).filter(a => a.type === 'Revenue' || a.type === 'Income'), a => a.balance),
-        expenses:    () => sumAmount(store.expenses),
+        expenses:    () => sumAmount(allExpenseRows()),
         payables:    () => sumAmount(store.payables),
         receivables: () => sumAmount((store.receivables || []).filter(r => !['Paid', 'Returned'].includes(receivableStatus(r)))),
         receivablesAll: () => sumAmount((store.receivables || []).filter(r => receivableStatus(r) !== 'Returned')),
@@ -1321,8 +1361,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (key === 'expenses') {
-            const rows = [...(store.expenses || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-            finDetailModal('Total Expenses', 'Every recorded expense voucher.',
+            const rows = [...allExpenseRows()].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            finDetailModal('Total Expenses', 'Expense vouchers, Accounts Payable and Accounts Receivable.',
                 ['Date', 'Category', 'Description', 'Amount'],
                 rows.map(r => [escapeHtml(r.date || '—'), escapeHtml(r.category || '—'),
                     escapeHtml(r.description || r.vendor || '—'),
@@ -1391,13 +1431,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function openExpenseCategoryDetail(cat) {
-        const grouped = groupExpenseCats(store.expenses || []);
+        const all = allExpenseRows();
+        const grouped = groupExpenseCats(all);
         const topCats = grouped.filter(([name]) => name !== 'Others').map(([name]) => name);
-        const rows = (store.expenses || []).filter(r => {
+        const rows = all.filter(r => {
             const name = r.category || 'Others';
             return cat === 'Others' ? !topCats.includes(name) : name === cat;
         });
-        finDetailModal(String(cat) + ' expenses', 'Expense vouchers in this category.',
+        finDetailModal(String(cat) + ' expenses', 'Expense vouchers, AP and AR in this category.',
             ['Date', 'Description', 'Amount', 'Status'],
             rows.map(r => [escapeHtml(r.date || '—'), escapeHtml(r.description || r.vendor || '—'),
                 `<span class="fin-detail-amount">${peso(r.amount)}</span>`,
@@ -6696,11 +6737,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const EXP_COLORS = ['#d9001b', '#ff7f50', '#ffc233', '#72c02c', '#6aaeff'];
 
     function expStatusMeta(status) {
-        const s = String(status || '').toLowerCase();
+        const s = String(status || '').trim().toLowerCase();
         if (s === 'rejected') return { label: 'Rejected', key: 'rejected' };
         if (s === 'paid' || s === 'posted') return { label: 'Paid', key: 'paid' };
         if (s === 'approved') return { label: 'Approved', key: 'approved' };
-        if (s === 'for review' || s === 'pending' || s === 'review') return { label: 'Pending', key: 'pending' };
+        if (['for review', 'pending', 'review', 'unpaid', 'partially paid', 'partial', 'overdue'].includes(s)) {
+            return { label: status || 'Pending', key: 'pending' };
+        }
         return { label: status || '—', key: 'other' };
     }
 
@@ -6742,7 +6785,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Pie chart + legend + footer stats for a status filter ('' = all)
     function expensePieParts(filterKey = '') {
-        const rows = (store.expenses || []).filter(r => !filterKey || expStatusMeta(r.status).key === filterKey);
+        const rows = allExpenseRows().filter(r => !filterKey || expStatusMeta(r.status).key === filterKey);
         const grouped = groupExpenseCats(rows);
         const total = grouped.reduce((s, [, v]) => s + v, 0);
         let svg = '<div class="exd-empty">No data</div>';
@@ -6794,7 +6837,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildExpenses() {
-        const rows = store.expenses || [];
+        const rows = allExpenseRows();
         const sum = (arr) => arr.reduce((s, r) => s + Number(r.amount || 0), 0);
         const total = financeTotals.expenses();
         const pending = sum(rows.filter(r => expStatusMeta(r.status).key === 'pending'));
@@ -6955,7 +6998,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const statusFilterEl = $('.custom-filter-dropdown[data-id="expStatusFilter"] .custom-filter-btn');
         const filterStatus = statusFilterEl ? (statusFilterEl.dataset.value || '') : '';
 
-        const rows = (store.expenses || []).filter(r => {
+        const rows = allExpenseRows().filter(r => {
             const itemStatus = expStatusMeta(r.status).key;
             const matchStatus = !filterStatus || itemStatus === filterStatus;
             if (!matchStatus) return false;
@@ -6965,7 +7008,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (!rows.length) {
-            const hasAny = (store.expenses || []).length > 0;
+            const hasAny = allExpenseRows().length > 0;
             const emptyMsg = hasAny
                 ? 'No vouchers match the current filter.'
                 : 'No expense vouchers yet. Record your first voucher to start tracking spend.';
@@ -6994,7 +7037,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     View
                 </button>`
             ];
-            if (canManageRecords()) {
+            if (!r.isApAr && canManageRecords()) {
                 if (st.key === 'pending') {
                     actionBtns.push(`<button class="btn-view-cash" type="button" data-act="approveExp" data-id="${escapeHtml(r.id)}" style="color:#1f9c50;">Approve</button>`);
                     actionBtns.push(`<button class="btn-view-cash" type="button" data-act="rejectExp" data-id="${escapeHtml(r.id)}" style="color:#c2181a;">Reject</button>`);
@@ -7140,7 +7183,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const act = btn.dataset.act;
         const id = btn.dataset.id;
         const exp = (store.expenses || []).find(x => String(x.id) === String(id));
-        if (!exp) return;
+        if (!exp) {
+            const linked = allExpenseRows().find(x => x.isApAr && String(x.id) === String(id));
+            if (linked && act === 'viewExp') viewExpense(linked);
+            return;
+        }
 
         if (act === 'viewExp') viewExpense(exp);
         if (act === 'editExp') openExpenseForm(exp);
@@ -7270,7 +7317,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(r => !f.status || r.status === f.status)
             .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
-        const expensesTotal = (store.expenses || [])
+        const expensesTotal = allExpenseRows()
             .filter(r => inRange(r.date))
             .filter(r => !f.status || r.status === f.status)
             .reduce((sum, r) => sum + Number(r.amount || 0), 0) + productionCosts;
@@ -7435,10 +7482,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             },
             expenses: () => {
-                const rows = store.expenses || [];
+                const rows = allExpenseRows();
                 return {
                     title: 'Expense Report',
-                    subtitle: 'Source: Expenses · All vouchers by category',
+                    subtitle: 'Source: Expenses, AP and AR · All vouchers by category',
                     columns: ['Voucher', 'Category', 'Date', 'Amount'],
                     rows: rows.map(r => [r.voucher || r.id, r.category, r.date, peso(r.amount)]),
                     filters: [

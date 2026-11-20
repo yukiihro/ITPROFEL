@@ -1436,6 +1436,54 @@ if ($action === 'audit' && $method === 'GET') {
     respond(['ok' => true, 'events' => $rows]);
 }
 
+/* Accounts Payable and Accounts Receivable are part of Total Expenses, so the
+   Expense CSV includes them alongside ordinary vouchers. They stay read-only
+   on the Expenses page; editing/deleting still applies only to expenses. */
+function expenseExportRows(array $state): array
+{
+    $rows = $state['expenses'] ?? [];
+
+    foreach ($state['payables'] ?? [] as $p) {
+        $ref = $p['invoice'] ?? ('AP-' . ($p['id'] ?? ''));
+        $description = 'Accounts Payable · ' . $ref;
+        if (!empty($p['vendor'])) $description .= ' · ' . $p['vendor'];
+        $rows[] = [
+            'id' => 'AP-' . ($p['id'] ?? ''),
+            'category' => 'Accounts Payable',
+            'vendor' => $description,
+            'date' => $p['due'] ?? '',
+            'amount' => $p['amount'] ?? 0,
+            'status' => $p['status'] ?? '',
+            'voucher' => $ref,
+            'paymentMethod' => 'Accounts Payable',
+            'reference' => $ref,
+            'attachmentName' => '',
+            'attachmentData' => ''
+        ];
+    }
+
+    foreach ($state['receivables'] ?? [] as $r) {
+        $ref = $r['invoice'] ?? ('AR-' . ($r['id'] ?? ''));
+        $description = 'Accounts Receivable · ' . $ref;
+        if (!empty($r['customer'])) $description .= ' · ' . $r['customer'];
+        $rows[] = [
+            'id' => 'AR-' . ($r['id'] ?? ''),
+            'category' => 'Accounts Receivable',
+            'vendor' => $description,
+            'date' => $r['due'] ?? '',
+            'amount' => $r['amount'] ?? 0,
+            'status' => $r['status'] ?? '',
+            'voucher' => $ref,
+            'paymentMethod' => 'Accounts Receivable',
+            'reference' => $ref,
+            'attachmentName' => '',
+            'attachmentData' => ''
+        ];
+    }
+
+    return $rows;
+}
+
 // ---------- EXPORT ----------
 if ($action === 'export' && $method === 'GET') {
     $u = requireUser();
@@ -1450,6 +1498,7 @@ if ($action === 'export' && $method === 'GET') {
     $state  = loadState();
     $rows   = $state[$entity] ?? [];
     if (!is_array($rows)) respond(['ok' => false, 'message' => 'Unknown export.'], 404);
+    if ($entity === 'expenses') $rows = expenseExportRows($state);
 
     $baseFilename = preg_replace('/[^a-z0-9_-]/i', '-', $entity) . '-' . date('Y-m-d');
 

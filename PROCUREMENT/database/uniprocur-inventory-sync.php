@@ -7,8 +7,9 @@ function uniInventoryUrl(string $resource): string {
         'sync' => 'http://127.0.0.1/ITPROFEL/INVENTORY/api/procurement-sync.php',
         'requests' => 'http://127.0.0.1/ITPROFEL/INVENTORY/api/requests.php',
         'receipts' => 'http://127.0.0.1/ITPROFEL/INVENTORY/api/delivery-receipts.php',
+        'rejections' => 'http://127.0.0.1/ITPROFEL/INVENTORY/api/rejected-items.php',
     ];
-    $envs = ['sync'=>'INVENTORY_SYNC_URL','requests'=>'INVENTORY_REQUESTS_URL','receipts'=>'INVENTORY_RECEIPTS_URL'];
+    $envs = ['sync'=>'INVENTORY_SYNC_URL','requests'=>'INVENTORY_REQUESTS_URL','receipts'=>'INVENTORY_RECEIPTS_URL','rejections'=>'INVENTORY_REJECTIONS_URL'];
     if (!isset($defaults[$resource])) throw new InvalidArgumentException('Unknown Inventory API resource');
     $v = trim((string)(getenv($envs[$resource]) ?: ($_SERVER[$envs[$resource]] ?? $defaults[$resource])));
     $url = parse_url($v);

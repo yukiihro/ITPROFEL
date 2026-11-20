@@ -113,7 +113,7 @@ try {
         try {
             $gr=$conn->prepare('SELECT gr.receipt_number FROM procurement_inventory_receipts gr
                 WHERE gr.po_id=? AND gr.po_number=? AND EXISTS
-                    (SELECT 1 FROM procurement_inventory_receipt_items x WHERE x.receipt_id=gr.id AND x.accepted_qty>0)
+                    (SELECT 1 FROM procurement_inventory_receipt_items x WHERE x.receipt_id=gr.id AND x.delivered_qty>0)
                 ORDER BY gr.id DESC LIMIT 1');
             $poNumber=(string)$po['po_number'];
             $gr->bind_param('is',$id,$poNumber);

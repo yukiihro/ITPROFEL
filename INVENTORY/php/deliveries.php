@@ -215,7 +215,7 @@ if ($action === "reject_raw_materials") {
 
     // Clear the prior pending rejection snapshot before writing the current selection.
     $pdo->prepare("UPDATE request_items ri JOIN items i ON i.id=ri.item_id
-      SET ri.inspection_accepted_quantity=ri.delivered_quantity,
+      SET ri.accepted_quantity=ri.delivered_quantity,ri.inspection_accepted_quantity=ri.delivered_quantity,
           ri.inspection_rejected_quantity=0,ri.inspection_rejection_reason=''
       WHERE ri.request_id=? AND i.item_type='Raw Material'")->execute([(int)$d["request_id"]]);
 
@@ -232,7 +232,21 @@ if ($action === "reject_raw_materials") {
       $updateLine->execute([$accepted, $accepted, $qty, $entry["reason"], $ri, (int)$d["request_id"]]);
     }
     $pdo->commit();
-    json_response(["success" => true, "message" => "Rejected Raw Materials were added to Rejected Items. Send the rejection email to create the Stock Adjustment.", "rejection_id" => $rejectionId]);
+    // UNIPROCUR_POST_RECEIPT_REJECTION_SYNC: Inventory commits first; Procurement re-verifies server-side.
+    $procurementSynced = null;
+    if (strcasecmp(trim((string)($d["requester_team"] ?? "")), "Inventory") === 0 &&
+        strcasecmp(trim((string)($d["destination"] ?? "")), "Procurement") === 0 &&
+        trim((string)($d["po_number"] ?? "")) !== "") {
+      require_once __DIR__ . "/procurement-rejection-callback.php";
+      $procurementSynced = inventoryNotifyProcurementRejection(
+        (string)$d["request_number"], (string)$d["po_number"], $rejectionId
+      );
+    }
+    $message = "Rejected Raw Materials were added to Rejected Items. Send the rejection email to create the Stock Adjustment.";
+    if ($procurementSynced === false) {
+      $message .= " Procurement sync failed; run the post-receipt reconciliation from the XAMPP host.";
+    }
+    json_response(["success" => true, "message" => $message, "rejection_id" => $rejectionId, "procurement_synced" => $procurementSynced]);
   } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     json_response(["success" => false, "message" => $e->getMessage()], 422);

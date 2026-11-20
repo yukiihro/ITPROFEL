@@ -25,7 +25,7 @@ if (strcasecmp($dept, 'HR') !== 0) {
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>D.E.V.S · HR Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=20261120guide1">
+    <link rel="stylesheet" href="style.css?v=20261120guide2">
 </head>
 <body>
 

@@ -42,7 +42,7 @@ unset($_SESSION['redirect_guard']);
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>D.E.V.S · Finance Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=20261120guide1">
+    <link rel="stylesheet" href="style.css?v=20261120guide2">
   <link rel="stylesheet" href="procurement_ap_inbox.css?v=3">
 </head>
 <body>

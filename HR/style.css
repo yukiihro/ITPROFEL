@@ -6567,7 +6567,7 @@ tr.is-selected td { background: transparent !important; }
 .guide-faq-empty[hidden] { display: none; }
 .guide-help {
     margin-top: 16px; padding: 18px 22px;
-    background: var(--brand-tint); border-color: rgba(165, 47, 62, .14);
+    background: var(--card-bg); border-color: rgba(165, 47, 62, .14);
 }
 .guide-help h3 { margin: 0 0 6px; font-size: 14px; color: var(--text-strong); }
 .guide-help p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); }

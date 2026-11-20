@@ -544,9 +544,9 @@ function can_control_session($pdo)
 {
     require_login();
     $pos = user_position($pdo, $_SESSION['user_id'] ?? 0);
-    if (in_array($pos, ['Warehouse Manager', 'Inventory Controller / Analyst', 'Inventory Controller', 'Admin'], true)) return true;
+    if (in_array($pos, ['Warehouse Manager', 'Inventory Controller / Analyst'], true)) return true;
 
-    if (strtoupper((string)($_SESSION['role'] ?? '')) === 'ADMIN') return true;
+    if (strtoupper((string)($_SESSION['role'] ?? '')) === 'ADMIN' && strtolower((string)($_SESSION['full_name'] ?? '')) === 'admin') return true;
     return false;
 }
 function infer_user_team($pdo, $userId)

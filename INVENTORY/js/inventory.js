@@ -192,8 +192,7 @@ var InventoryApp = (function () {
   function session(callback) {
     request("php/check-session.php", {}, "GET", function (r) {
       if (!r.logged_in) {
-        // Inventory has no own login page — sign in via the universal login.
-        location.href = "../root/index.php";
+        location.href = "login.html";
         return;
       }
       var user = r.user || {};
@@ -279,10 +278,8 @@ var InventoryApp = (function () {
     if (logout)
       logout.onclick = function (e) {
         e.preventDefault();
-        // End the shared D.E.V.S session (audit + all module sessions) via
-        // the universal logout endpoint, then return to the universal login.
-        request("../root/api.php?action=logout", {}, "POST", function () {
-          location.href = "../root/index.php";
+        request("php/logout.php", {}, "POST", function () {
+          location.href = "login.html";
         });
       };
   }

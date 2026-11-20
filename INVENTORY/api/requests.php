@@ -28,11 +28,9 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
             "SELECT ri.id request_item_id, ri.item_id, ri.item_name,
                     ri.size, ri.quantity requested_quantity,
                     ri.approved_quantity, ri.delivered_quantity,
-                    ri.accepted_quantity, ri.unit, i.item_code,
-                    ri.warehouse_id, w.warehouse_code, w.warehouse_name, w.location warehouse_location
+                    ri.accepted_quantity, ri.unit, i.item_code
              FROM request_items ri
              LEFT JOIN items i ON i.id = ri.item_id
-             LEFT JOIN warehouses w ON w.id = ri.warehouse_id
              WHERE ri.request_id = ?
              ORDER BY ri.id"
         );
@@ -96,9 +94,6 @@ foreach ($items as $item) {
         api_response(false, "The item name does not match the supplied item_id: " . $itemId, null, 422);
     }
 
-    // The request's size is authoritative. Never replace it with the local
-    // Item Master size, because integrated systems can have different IDs
-    // or multiple size variants under the same item name.
     if ($requestedSize !== "") {
         $match = $pdo->prepare("SELECT id, item_name, item_type, size, unit, status FROM items WHERE LOWER(TRIM(item_name))=LOWER(TRIM(?)) AND TRIM(COALESCE(size,''))=TRIM(?) AND status='Active' ORDER BY id LIMIT 1");
         $match->execute([$itemName !== "" ? $itemName : $itemRecord["item_name"], $requestedSize]);
@@ -132,8 +127,6 @@ foreach ($items as $item) {
 $requestNumber = "REQ-" . date("YmdHis") . random_int(10, 99);
 $expectedDate = trim($data["expected_delivery_date"] ?? "");
 $remarks = trim($data["remarks"] ?? "");
-// Production sends its Production Order number (PO-xxxx) with material requests.
-// Procurement and Sales may also supply their own P.O. number.
 $poNumber = trim((string)($data["po_number"] ?? ""));
 if (strlen($poNumber) > 100) {
     api_response(false, "P.O. Number must not exceed 100 characters.", null, 422);

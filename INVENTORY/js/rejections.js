@@ -56,6 +56,7 @@ var RejectionPage = {
             $("rejectionDetailBody").hidden = true;
             $("rejectionDetailEmpty").hidden = false;
             $("sendEmailBtn").disabled = true;
+            $("sendEmailBtn").hidden = true;
           }
         },
       );
@@ -233,6 +234,10 @@ var RejectionPage = {
           $("rejectionDetailBody").innerHTML = body;
           $("rejectionDetailBody").hidden = false;
           $("rejectionDetailEmpty").hidden = true;
+          // Recipient is manually chosen by the Inventory user for each report.
+          $("rejectionRecipientWrap").hidden = !!d.email_sent_at;
+          $("rejectionRecipientEmail").value = "prbuyer026@gmail.com";
+          $("sendEmailBtn").hidden = !!d.email_sent_at;
           $("sendEmailBtn").disabled = false;
           $("sendEmailBtn").textContent = "➤  Send Email";
           pendingEmail = "";
@@ -242,7 +247,6 @@ var RejectionPage = {
       );
     }
     function generatePdf(d) {
-      // Build a small standards-compliant PDF locally; no CDN or internet dependency.
       var pageW = 595.28,
         pageH = 841.89,
         margin = 42,
@@ -546,68 +550,55 @@ var RejectionPage = {
       if (b) show(b.dataset.view);
     };
     $("sendEmailBtn").onclick = function () {
-      if (!current) return;
-      if (pendingEmailId && Number(pendingEmailId) === Number(current.id)) {
-        if (
-          !confirm(
-            "Have you attached the downloaded PDF and sent the email in Gmail?",
-          )
-        )
-          return;
-        InventoryApp.request(
-          "php/rejections.php",
-          {
-            action: "email_sent",
-            id: pendingEmailId,
-            supplier_gmail: pendingEmail,
-          },
-          "POST",
-          function (r) {
-            InventoryApp.toast(r.message);
-            if (r.success) {
-              pendingEmail = "";
-              pendingEmailId = null;
-              $("sendEmailBtn").textContent = "➤  Send Email";
-              show(current.id);
-              load();
-            }
-          },
-        );
+      if (!current || current.email_sent_at) return;
+      var d = current;
+      var email = ($("rejectionRecipientEmail").value || "").trim();
+      // Fixed Procurement recipient: keep rejection reports routed to the Buyer inbox.
+      if (email.toLowerCase() !== "prbuyer026@gmail.com") {
+        email = "prbuyer026@gmail.com";
+        $("rejectionRecipientEmail").value = email;
+      }
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        InventoryApp.toast("Please enter a valid recipient email address.");
+        $("rejectionRecipientEmail").focus();
         return;
       }
-      var d = current,
-        email = (d.supplier_gmail || "").trim();
-      if (!email)
-        email = window.prompt(
-          "Enter the supplier or department email address:",
-          "",
-        );
-      if (!email) return;
-      email = email.trim();
-      if (!/^\S+@\S+\.\S+$/.test(email)) {
-        InventoryApp.toast("Please enter a valid email address.");
+      if (pendingEmailId && Number(pendingEmailId) === Number(d.id)) {
+        if (!confirm("Have you attached the downloaded PDF and successfully sent the email to " + email + "?")) return;
+        InventoryApp.request("php/rejections.php", {
+          action: "email_sent", id: d.id, supplier_gmail: email
+        }, "POST", function (r) {
+          InventoryApp.toast(r.message || (r.success ? "Email status saved." : "Unable to update email status."));
+          if (r.success) {
+            pendingEmail = "";
+            pendingEmailId = null;
+            current = null;
+            $("rejectionDetailBody").hidden = true;
+            $("rejectionDetailEmpty").hidden = false;
+            $("rejectionRecipientWrap").hidden = true;
+            $("sendEmailBtn").hidden = true;
+            load();
+          }
+        });
         return;
       }
       if (!generatePdf(d)) return;
-      var subject =
-          "Rejected Items Notice - " + (d.po_number || d.report_number),
-        body = makeEmailText(d);
-      var url =
-        "https://mail.google.com/mail/?view=cm&fs=1&to=" +
-        encodeURIComponent(email) +
-        "&su=" +
-        encodeURIComponent(subject) +
-        "&body=" +
-        encodeURIComponent(body);
+      var subject = "Rejected Items Notice - " + (d.po_number || d.report_number);
+      var body = makeEmailText(d);
+      var url = "https://mail.google.com/mail/?view=cm&fs=1" +
+        "&authuser=" + encodeURIComponent("inventorymanagement026@gmail.com") +
+        "&to=" + encodeURIComponent(email) +
+        "&su=" + encodeURIComponent(subject) +
+        "&body=" + encodeURIComponent(body);
       var gmailWindow = window.open(url, "_blank");
+      if (!gmailWindow) {
+        InventoryApp.toast("PDF downloaded, but the Gmail window was blocked. Allow pop-ups, then click Send Email again.");
+        return;
+      }
       pendingEmail = email;
       pendingEmailId = d.id;
-      $("sendEmailBtn").textContent = "✓  Mark as Email Sent";
-      InventoryApp.toast(
-        gmailWindow
-          ? "PDF downloaded and Gmail Compose opened. Drag the PDF into Gmail, send it, then return here and click Mark as Email Sent."
-          : "PDF downloaded. Pop-up was blocked; open Gmail manually, attach the PDF, send it, then return here and click Mark as Email Sent.",
-      );
+      $("sendEmailBtn").textContent = "✓  Confirm Email Sent";
+      InventoryApp.toast("Gmail opened with your selected recipient. Attach the downloaded PDF and send the email, then return here and confirm.");
     };
     $("rejectionSearch").oninput = render;
     $("refreshRejections").onclick = load;

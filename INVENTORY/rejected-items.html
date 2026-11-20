@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Rejected Items - Inventory Management System</title>
-    <link rel="stylesheet" href="css/style.css?v=30261110-rejected-items-v1" />
+    <link rel="stylesheet" href="css/style.css?v=20261110-rejected-items-v1" />
   </head>
   <body class="app" data-page="rejected-items">
     <aside class="sidebar" id="sidebar">
@@ -60,8 +60,8 @@
             class="admin-only"
             href="rejected-items.html"
             data-page="rejected-items"
-            >Rejected Items</a
-          >
+            >Rejected Items</a>
+          <a class="admin-only" href="rejected-return-items.html" data-page="rejected-return-items">Rejected/Return Items</a>
         </div>
         <div class="side-label">SETTINGS</div>
         <a class="nav-link" href="#" id="logoutBtn"><span>↪</span>Logout</a>
@@ -152,6 +152,10 @@
               </button>
             </div>
           </div>
+          <div id="rejectionRecipientWrap" class="toolbar" hidden style="padding:14px 18px 0;gap:10px;align-items:center">
+            <label for="rejectionRecipientEmail" style="font-weight:600;white-space:nowrap">Recipient Email:</label>
+            <input type="email" id="rejectionRecipientEmail" value="prbuyer026@gmail.com" readonly aria-readonly="true" autocomplete="email" style="max-width:420px;flex:1" />
+          </div>
           <div class="rejection-detail-empty" id="rejectionDetailEmpty">
             Select a rejection report using the View button to see its linked
             delivery receipt details and inspection summary.
@@ -165,7 +169,7 @@
       </main>
     </div>
     <div id="toast" class="toast"></div>
-    <script src="js/inventory.js?v=50261109-rejection-v6"></script>
-    <script src="js/rejections.js?v=20261110-rejected-items-v1"></script>
+    <script src="js/inventory.js?v=20261120universallogin1"></script>
+    <script src="js/rejections.js?v=20261120-gmail-no-prompt-v3"></script>
   </body>
 </html>

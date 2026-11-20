@@ -1,5 +1,6 @@
 <?php
 require_once "database.php";
+try { $pdo->exec("ALTER TABLE supplier_rejection_items ADD COLUMN item_action VARCHAR(30) NOT NULL DEFAULT 'Inspection Reject'"); } catch (Throwable $e) {}
 require_admin();
 
 $type = $_GET["report_type"] ?? "inventory_summary";
@@ -47,11 +48,13 @@ if ($type === "monthly_summary") {
   $sql = "SELECT i.id item_id,i.item_name,i.item_type,i.size,i.unit,w.id warehouse_id,w.warehouse_name,i.reorder_level,
    COALESCE(SUM(CASE WHEN sm.movement_type IN ('STOCK IN','STOCK TRANSFER IN','SALES RETURN') THEN sm.quantity ELSE 0 END),0) stock_in,
    COALESCE(SUM(CASE WHEN sm.movement_type IN ('STOCK OUT','STOCK TRANSFER OUT') THEN sm.quantity ELSE 0 END),0) stock_out,
-   COALESCE(SUM(CASE WHEN sm.movement_type='STOCK ADJUSTMENT' THEN sm.quantity ELSE 0 END),0) adjustments
+   COALESCE(SUM(CASE WHEN sm.movement_type='STOCK ADJUSTMENT' THEN sm.quantity ELSE 0 END),0) adjustments,
+   (SELECT COALESCE(SUM(sri.rejected_quantity),0) FROM supplier_rejection_items sri JOIN request_items ri ON ri.id=sri.request_item_id JOIN supplier_rejections sr ON sr.id=sri.rejection_id WHERE ri.item_id=i.id AND ri.warehouse_id=w.id AND sri.item_action IN ('Inspection Reject','Reject') AND sr.received_date BETWEEN ? AND ?) rejected_qty,
+   (SELECT COALESCE(SUM(sri.rejected_quantity),0) FROM supplier_rejection_items sri JOIN request_items ri ON ri.id=sri.request_item_id JOIN supplier_rejections sr ON sr.id=sri.rejection_id WHERE ri.item_id=i.id AND ri.warehouse_id=w.id AND sri.item_action='Return' AND sr.received_date BETWEEN ? AND ?) return_qty
    FROM items i JOIN warehouses w ON w.status='Active'
    LEFT JOIN stock_movements sm ON sm.item_id=i.id AND sm.warehouse_id=w.id AND sm.date BETWEEN ? AND ?
    WHERE i.status='Active'";
-  $p = [$from, $to];
+  $p = [$from, $to, $from, $to, $from, $to];
   if ($item) {
     $sql .= " AND i.id=?";
     $p[] = $item;
@@ -74,7 +77,7 @@ if ($type === "monthly_summary") {
     $size = trim((string)($r['size'] ?? ''));
     $unit = trim((string)$r['unit']);
     $key = strtolower(preg_replace('/\s+/', ' ', $name)) . '|' . strtolower(trim((string)$r['item_type'])) . '|' . strtolower(preg_replace('/\s+/', ' ', $size)) . '|' . strtolower(preg_replace('/\s+/', ' ', $unit));
-    if (!isset($groups[$key])) $groups[$key] = ['item_name' => $name, 'item_type' => $r['item_type'], 'size' => $size, 'unit' => $unit, 'warehouses' => [], 'stock_in' => 0, 'stock_out' => 0, 'adjustments' => 0];
+    if (!isset($groups[$key])) $groups[$key] = ['item_name' => $name, 'item_type' => $r['item_type'], 'size' => $size, 'unit' => $unit, 'warehouses' => [], 'stock_in' => 0, 'stock_out' => 0, 'adjustments' => 0, 'rejected_qty' => 0, 'return_qty' => 0];
     $g = &$groups[$key];
     $wid = (string)$r['warehouse_id'];
     if (!isset($g['warehouses'][$wid])) $g['warehouses'][$wid] = ['name' => $r['warehouse_name'], 'reorder' => (float)$r['reorder_level']];
@@ -82,6 +85,8 @@ if ($type === "monthly_summary") {
     $g['stock_in'] += (float)$r['stock_in'];
     $g['stock_out'] += (float)$r['stock_out'];
     $g['adjustments'] += (float)$r['adjustments'];
+    $g['rejected_qty'] += (float)$r['rejected_qty'];
+    $g['return_qty'] += (float)$r['return_qty'];
     unset($g);
   }
   $totalIn = 0;
@@ -103,12 +108,15 @@ if ($type === "monthly_summary") {
     $totalBeg += $beg;
     $totalEnd += $end;
     $warehouseNames = array_values(array_unique(array_column($g['warehouses'], 'name')));
-    $rows[] = ['item_name' => $g['item_name'], 'item_type' => $g['item_type'], 'size' => $g['item_type'] === "Raw Material" ? "----" : ($g['size'] !== "" ? $g['size'] : "----"), 'warehouse_name' => implode(', ', $warehouseNames), 'beginning_stock' => $beg, 'stock_in' => $in, 'stock_out' => $out, 'adjustments' => $adj, 'ending_stock' => $end, 'reorder_level' => $reorder, 'status' => $status];
+    $rows[] = ['item_name' => $g['item_name'], 'item_type' => $g['item_type'], 'size' => $g['item_type'] === "Raw Material" ? "----" : ($g['size'] !== "" ? $g['size'] : "----"), 'warehouse_name' => implode(', ', $warehouseNames), 'beginning_stock' => $beg, 'stock_in' => $in, 'stock_out' => $out, 'adjustments' => $adj, 'rejected_qty' => $g['rejected_qty'], 'return_qty' => $g['return_qty'], 'ending_stock' => $end, 'reorder_level' => $reorder, 'status' => $status];
   }
-  $cols = [['key' => 'item_name', 'label' => 'Item'], ['key' => 'item_type', 'label' => 'Type'], ['key' => 'size', 'label' => 'Size'], ['key' => 'warehouse_name', 'label' => 'Warehouse'], ['key' => 'beginning_stock', 'label' => 'Beginning Stock'], ['key' => 'stock_in', 'label' => 'Stock In'], ['key' => 'stock_out', 'label' => 'Stock Out'], ['key' => 'adjustments', 'label' => 'Adjustments'], ['key' => 'ending_stock', 'label' => 'Ending Stock'], ['key' => 'reorder_level', 'label' => 'Reorder Level'], ['key' => 'status', 'label' => 'Status']];
+  $cols = [['key' => 'item_name', 'label' => 'Item'], ['key' => 'item_type', 'label' => 'Type'], ['key' => 'size', 'label' => 'Size'], ['key' => 'warehouse_name', 'label' => 'Warehouse'], ['key' => 'beginning_stock', 'label' => 'Beginning Stock'], ['key' => 'stock_in', 'label' => 'Stock In'], ['key' => 'stock_out', 'label' => 'Stock Out'], ['key' => 'adjustments', 'label' => 'Adjustments'], ['key' => 'rejected_qty', 'label' => 'Rejected'], ['key' => 'return_qty', 'label' => 'Return Item'], ['key' => 'ending_stock', 'label' => 'Ending Stock'], ['key' => 'reorder_level', 'label' => 'Reorder Level'], ['key' => 'status', 'label' => 'Status']];
   $summary = ['date_from' => $from, 'date_to' => $to, 'total_beginning_stock' => $totalBeg, 'total_stock_in' => $totalIn, 'total_stock_out' => $totalOut, 'total_ending_stock' => $totalEnd, 'low_stock_items' => $lowCount];
 } elseif ($type === "inventory_summary" || $type === "warehouse_inventory" || $type === "raw_materials" || $type === "finished_goods") {
-  $sql = "SELECT i.id item_id,i.item_name,i.item_type,i.size,i.unit,c.category_name,w.id warehouse_id,w.warehouse_name,COALESCE(inv.quantity,0) quantity,i.reorder_level FROM items i LEFT JOIN categories c ON c.id=i.category_id JOIN warehouses w ON w.status='Active' LEFT JOIN inventory inv ON inv.item_id=i.id AND inv.warehouse_id=w.id WHERE i.status='Active'";
+  $sql = "SELECT i.id item_id,i.item_name,i.item_type,i.size,i.unit,c.category_name,w.id warehouse_id,w.warehouse_name,COALESCE(inv.quantity,0) quantity,i.reorder_level,
+    (SELECT COALESCE(SUM(sri.rejected_quantity),0) FROM supplier_rejection_items sri JOIN request_items ri ON ri.id=sri.request_item_id JOIN supplier_rejections sr ON sr.id=sri.rejection_id WHERE ri.item_id=i.id AND ri.warehouse_id=w.id AND sri.item_action IN ('Inspection Reject','Reject')) rejected_qty,
+    (SELECT COALESCE(SUM(sri.rejected_quantity),0) FROM supplier_rejection_items sri JOIN request_items ri ON ri.id=sri.request_item_id JOIN supplier_rejections sr ON sr.id=sri.rejection_id WHERE ri.item_id=i.id AND ri.warehouse_id=w.id AND sri.item_action='Return') return_qty
+    FROM items i LEFT JOIN categories c ON c.id=i.category_id JOIN warehouses w ON w.status='Active' LEFT JOIN inventory inv ON inv.item_id=i.id AND inv.warehouse_id=w.id WHERE i.status='Active'";
   $p = [];
   if ($item) {
     $sql .= " AND i.id=?";
@@ -140,18 +148,20 @@ if ($type === "monthly_summary") {
     $size = trim((string)($r['size'] ?? ''));
     $unit = trim((string)$r['unit']);
     $key = strtolower(preg_replace('/\s+/', ' ', $name)) . '|' . strtolower(trim((string)$r['item_type'])) . '|' . strtolower(preg_replace('/\s+/', ' ', $size)) . '|' . strtolower(preg_replace('/\s+/', ' ', $unit));
-    if (!isset($groups[$key])) $groups[$key] = ['item_name' => $name, 'item_type' => $r['item_type'], 'size' => $size, 'unit' => $unit, 'category_name' => $r['category_name'], 'warehouses' => [], 'quantity' => 0];
+    if (!isset($groups[$key])) $groups[$key] = ['item_name' => $name, 'item_type' => $r['item_type'], 'size' => $size, 'unit' => $unit, 'category_name' => $r['category_name'], 'warehouses' => [], 'quantity' => 0, 'rejected_qty' => 0, 'return_qty' => 0];
     $g = &$groups[$key];
     $wid = (string)$r['warehouse_id'];
     if (!isset($g['warehouses'][$wid])) $g['warehouses'][$wid] = ['name' => $r['warehouse_name'], 'reorder' => (float)$r['reorder_level']];
     else $g['warehouses'][$wid]['reorder'] = max($g['warehouses'][$wid]['reorder'], (float)$r['reorder_level']);
     $g['quantity'] += (float)$r['quantity'];
+    $g['rejected_qty'] += (float)$r['rejected_qty'];
+    $g['return_qty'] += (float)$r['return_qty'];
     unset($g);
   }
   foreach ($groups as $g) {
-    $rows[] = ['item_name' => $g['item_name'], 'item_type' => $g['item_type'], 'size' => $g['item_type'] === "Raw Material" ? "----" : ($g['size'] !== "" ? $g['size'] : "----"), 'category_name' => $g['category_name'], 'warehouse_name' => implode(', ', array_unique(array_column($g['warehouses'], 'name'))), 'quantity' => $g['quantity'], 'reorder_level' => array_sum(array_column($g['warehouses'], 'reorder')), 'unit' => $g['unit']];
+    $rows[] = ['item_name' => $g['item_name'], 'item_type' => $g['item_type'], 'size' => $g['item_type'] === "Raw Material" ? "----" : ($g['size'] !== "" ? $g['size'] : "----"), 'category_name' => $g['category_name'], 'warehouse_name' => implode(', ', array_unique(array_column($g['warehouses'], 'name'))), 'quantity' => $g['quantity'], 'rejected_qty' => $g['rejected_qty'], 'return_qty' => $g['return_qty'], 'reorder_level' => array_sum(array_column($g['warehouses'], 'reorder')), 'unit' => $g['unit']];
   }
-  $cols = [['key' => 'item_name', 'label' => 'Item Name'], ['key' => 'item_type', 'label' => 'Type'], ['key' => 'size', 'label' => 'Size'], ['key' => 'category_name', 'label' => 'Category'], ['key' => 'warehouse_name', 'label' => 'Warehouse'], ['key' => 'quantity', 'label' => 'Stock'], ['key' => 'reorder_level', 'label' => 'Reorder'], ['key' => 'unit', 'label' => 'Unit']];
+  $cols = [['key' => 'item_name', 'label' => 'Item Name'], ['key' => 'item_type', 'label' => 'Type'], ['key' => 'size', 'label' => 'Size'], ['key' => 'category_name', 'label' => 'Category'], ['key' => 'warehouse_name', 'label' => 'Warehouse'], ['key' => 'quantity', 'label' => 'Stock'], ['key' => 'rejected_qty', 'label' => 'Rejected'], ['key' => 'return_qty', 'label' => 'Return Item'], ['key' => 'reorder_level', 'label' => 'Reorder'], ['key' => 'unit', 'label' => 'Unit']];
 } elseif (in_array($type, ["stock_in", "stock_out", "stock_transfer", "stock_adjustment"])) {
   if ($type === "stock_in") {
     $sql = "SELECT sr_rows.date,sr_rows.number,i.item_code,i.item_name,i.item_type,i.size,w.warehouse_name,sr_rows.quantity,sr_rows.unit,sr_rows.supplier,sr_rows.reference_number FROM (

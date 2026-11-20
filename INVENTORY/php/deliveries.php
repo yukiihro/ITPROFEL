@@ -1,7 +1,10 @@
 <?php
 require_once "database.php";
-require_once __DIR__ . "/procurement-po-supplier-bridge-v11.php";
 require_login();
+try {
+  $pdo->exec("ALTER TABLE supplier_rejection_items ADD COLUMN item_action VARCHAR(30) NOT NULL DEFAULT 'Inspection Reject'");
+} catch (Throwable $e) {
+}
 $action = $_REQUEST["action"] ?? "list";
 function delivery_target_qty($it)
 {
@@ -41,6 +44,16 @@ function delivery_rows($pdo)
     $q = $pdo->prepare("SELECT ri.id,ri.item_name,ri.quantity,ri.approved_quantity,ri.rejected_quantity,ri.delivered_quantity,ri.accepted_quantity,ri.inspection_accepted_quantity,ri.inspection_rejected_quantity,ri.inspection_rejection_reason,ri.unit,ri.size,i.item_code,i.item_type,i.size item_size,i.supplier_name,w.warehouse_name,w.location FROM request_items ri LEFT JOIN items i ON i.id=ri.item_id LEFT JOIN warehouses w ON w.id=ri.warehouse_id WHERE ri.request_id=? ORDER BY ri.id");
     $q->execute([$row["request_id"]]);
     $row["items"] = $q->fetchAll();
+    $manualRejects = $pdo->prepare("SELECT request_item_id, COALESCE(SUM(rejected_quantity),0) AS rejected_action_quantity FROM supplier_rejection_items WHERE item_action='Reject' GROUP BY request_item_id");
+    $manualRejects->execute();
+    $manualRejectMap = [];
+    foreach ($manualRejects->fetchAll(PDO::FETCH_ASSOC) as $manualReject) {
+      $manualRejectMap[(int)$manualReject["request_item_id"]] = (int)$manualReject["rejected_action_quantity"];
+    }
+    foreach ($row["items"] as &$deliveryItem) {
+      $deliveryItem["rejected_action_quantity"] = $manualRejectMap[(int)$deliveryItem["id"]] ?? 0;
+    }
+    unset($deliveryItem);
     $isInventory = strtolower(trim((string)($row["requester_team"] ?? ""))) === "inventory";
     $row["is_inventory_request"] = $isInventory ? 1 : 0;
     $row["total_items"] = count($row["items"]);
@@ -51,15 +64,10 @@ function delivery_rows($pdo)
     $row["qty_total"] = 0;
     foreach ($row["items"] as &$it) {
       $target = $isInventory ? (int)$it["quantity"] : (int)$it["approved_quantity"];
-      // Older records may have inspection_accepted_quantity populated while accepted_quantity is still 0.
-      // Use the higher confirmed accepted quantity so a complete delivery is not shown as partial.
       $acceptedRecorded = max(
         (int)($it["accepted_quantity"] ?? 0),
         (int)($it["inspection_accepted_quantity"] ?? 0)
       );
-      // Remaining balance is based on the approved delivery target minus the
-      // physical quantity already delivered. Rejected units were still delivered,
-      // so they remain part of the delivered quantity.
       $remaining = max(0, $target - (int)($it["delivered_quantity"] ?? 0));
       $it["remaining_balance"] = $remaining;
       $it["delivery_target"] = $target;
@@ -72,9 +80,6 @@ function delivery_rows($pdo)
     }
     unset($it);
     if ($isInventory) {
-      // Shipment status reflects physical quantities only:
-      // short shipment = Partially Delivered; full shipment = Out for Delivery
-      // until the Confirm Receipt form is completed, then Delivered.
       $allShipped = true;
       $anyShipped = false;
       foreach ($row["items"] as $it) {
@@ -83,9 +88,6 @@ function delivery_rows($pdo)
         if ($shipped > 0) $anyShipped = true;
         if ($shipped < $target) $allShipped = false;
       }
-      // A complete shipment is NOT a completed receipt. Inventory must open
-      // Confirm Receipt and save Delivered / Accepted / Rejected quantities.
-      // Only the explicit receipt-confirmation timestamp may finalize it.
       if (!empty($row["receipt_confirmed_at"])) $row["status"] = "Delivered";
       elseif ($allShipped && $anyShipped) $row["status"] = "Out for Delivery";
       elseif ($anyShipped) $row["status"] = "Partially Delivered";
@@ -121,19 +123,6 @@ function delivery_rows($pdo)
   return $rows;
 }
 
-// v11: Only authorized Inventory staff can ask the server for the authoritative PO supplier.
-if ($action === "po_supplier") {
-  require_admin();
-  try {
-    $po = trim((string)($_GET["po_number"] ?? ""));
-    $request = trim((string)($_GET["request_number"] ?? ""));
-    $supplier = inventoryPoSupplierV11($po, $request);
-    json_response(["success" => true, "po_number" => $po, "supplier_name" => $supplier]);
-  } catch (Throwable $e) {
-    error_log('v11 Inventory supplier lookup: ' . $e->getMessage());
-    json_response(["success" => false, "message" => "Could not verify supplier from Procurement PO. Check server configuration."], 409);
-  }
-}
 if ($action === "list") {
   json_response(["success" => true, "rows" => delivery_rows($pdo)]);
 }
@@ -161,6 +150,89 @@ if ($action === "update") {
   }
 }
 
+
+if ($action === "reject_return") {
+  require_admin();
+  $id = (int)post_value("id");
+  $requestItemId = (int)post_value("request_item_id");
+  $quantity = (int)post_value("quantity");
+  $acceptedQuantity = (int)post_value("accepted_quantity", "0");
+  $type = "Reject";
+  $reason = trim((string)post_value("reason"));
+  if ($quantity < 1 || $acceptedQuantity < 0 || $reason === "") {
+    json_response(["success" => false, "message" => "Enter a valid rejected quantity and provide a reason."], 422);
+  }
+  $pdo->beginTransaction();
+  try {
+    $q = $pdo->prepare("SELECT d.*,r.request_number,r.requester_team,r.destination,r.po_number,r.recipient_gmail,r.recipient_name FROM deliveries d JOIN requests r ON r.id=d.request_id WHERE d.id=? FOR UPDATE");
+    $q->execute([$id]);
+    $delivery = $q->fetch();
+    if (!$delivery) throw new Exception("Delivery not found.");
+    if (strtolower(trim((string)$delivery["requester_team"])) !== "inventory" || $delivery["status"] !== "Delivered") {
+      throw new Exception("Reject / Return is available only for Delivered requests made by Inventory.");
+    }
+    $itemQuery = $pdo->prepare("SELECT ri.*,i.item_type,i.size item_master_size,i.supplier_name FROM request_items ri LEFT JOIN items i ON i.id=ri.item_id WHERE ri.id=? AND ri.request_id=? FOR UPDATE");
+    $itemQuery->execute([$requestItemId, $delivery["request_id"]]);
+    $item = $itemQuery->fetch();
+    if (!$item) throw new Exception("Requested item not found.");
+    if (strtolower(trim((string)($item["item_type"] ?? ""))) !== "raw material") {
+      throw new Exception("Only Raw Materials can be marked as Rejected.");
+    }
+    $alreadyActioned = $pdo->prepare("SELECT COUNT(*) FROM supplier_rejection_items WHERE request_item_id=? AND item_action='Reject'");
+    $alreadyActioned->execute([$requestItemId]);
+    if ((int)$alreadyActioned->fetchColumn() > 0) {
+      throw new Exception("This Raw Material has already been marked as Rejected.");
+    }
+    $deliveredQuantity = (int)$item["delivered_quantity"];
+    if ($acceptedQuantity > $deliveredQuantity) throw new Exception("Accepted quantity cannot be greater than delivered quantity.");
+    $available = max(0, $deliveredQuantity - $acceptedQuantity);
+    if ($quantity > $available) throw new Exception("Rejected quantity cannot exceed delivered quantity minus accepted quantity (" . $available . ").");
+    $pdo->prepare("UPDATE request_items SET accepted_quantity=?,inspection_accepted_quantity=? WHERE id=? AND request_id=?")
+      ->execute([$acceptedQuantity, $acceptedQuantity, $requestItemId, $delivery["request_id"]]);
+    $itemId = (int)$item["item_id"];
+    if ($itemId <= 0) throw new Exception("Item is not linked to Item Master.");
+    $warehouseId = (int)$item["warehouse_id"];
+    if ($warehouseId <= 0) throw new Exception("Receiving warehouse is missing.");
+    $stockQuery = $pdo->prepare("SELECT quantity FROM inventory WHERE item_id=? AND warehouse_id=? FOR UPDATE");
+    $stockQuery->execute([$itemId, $warehouseId]);
+    $current = (int)$stockQuery->fetchColumn();
+    if ($quantity > $current) throw new Exception("There is not enough current stock in the selected warehouse to process this action.");
+    $adjusted = $current - $quantity;
+    $po = trim((string)$delivery["po_number"]);
+    $supplier = trim((string)($item["supplier_name"] ?? "")) ?: trim((string)$delivery["recipient_name"]);
+    $find = $pdo->prepare("SELECT id FROM supplier_rejections WHERE delivery_id=? LIMIT 1");
+    $find->execute([$id]);
+    $rejectionId = (int)$find->fetchColumn();
+    if (!$rejectionId) {
+      $insertReport = $pdo->prepare("INSERT INTO supplier_rejections(request_id,delivery_id,po_number,supplier_name,received_date,report_status,created_by) VALUES(?,?,?,?,CURDATE(),'Pending',?)");
+      $insertReport->execute([$delivery["request_id"], $id, $po, $supplier, $_SESSION["user_id"]]);
+      $rejectionId = (int)$pdo->lastInsertId();
+      $reportNumber = "RR-" . date("Y") . "-" . str_pad((string)$rejectionId, 3, "0", STR_PAD_LEFT);
+      $pdo->prepare("UPDATE supplier_rejections SET report_number=? WHERE id=?")->execute([$reportNumber, $rejectionId]);
+    }
+    $label = "Rejected Item";
+    $reportReason = $label . ": " . $reason;
+    $pdo->prepare("UPDATE supplier_rejections SET report_status='Pending',supplier_response=NULL,email_sent_at=NULL,supplier_response_at=NULL WHERE id=?")->execute([$rejectionId]);
+    $insertItem = $pdo->prepare("INSERT INTO supplier_rejection_items(rejection_id,request_item_id,item_name,ordered_quantity,delivered_quantity,accepted_quantity,rejected_quantity,unit,rejection_reason,item_action) VALUES(?,?,?,?,?,?,?,?,?,?)");
+    $insertItem->execute([$rejectionId, $requestItemId, $item["item_name"], (int)$item["quantity"], (int)$item["delivered_quantity"], $acceptedQuantity, $quantity, $item["unit"] ?: "pcs", $reportReason, $type]);
+    $adjustmentNumber = $label === "Return Item"
+      ? "RET-" . $id . "-" . $requestItemId . "-" . time()
+      : "REJ-" . $id . "-" . $requestItemId . "-" . time();
+    $remarks = $label . " from request " . $delivery["request_number"] . "; Quantity: " . $quantity . " " . ($item["unit"] ?: "pcs") . "; Reason: " . $reason;
+    $pdo->prepare("INSERT INTO stock_adjustments(adjustment_number,item_id,warehouse_id,current_quantity,adjusted_quantity,difference,reason,remarks,date,user_id) VALUES(?,?,?,?,?,?,?,?,CURDATE(),?)")
+      ->execute([$adjustmentNumber, $itemId, $warehouseId, $current, $adjusted, -$quantity, $label, $remarks, $_SESSION["user_id"]]);
+    $pdo->prepare("UPDATE inventory SET quantity=? WHERE item_id=? AND warehouse_id=?")->execute([$adjusted, $itemId, $warehouseId]);
+    $pdo->prepare("INSERT INTO stock_movements(item_id,warehouse_id,movement_type,quantity,unit,reference_number,remarks,date,user_id) VALUES(?,?,?,?,?,?,?,?,?)")
+      ->execute([$itemId, $warehouseId, "STOCK ADJUSTMENT", -$quantity, $item["unit"] ?: "pcs", $adjustmentNumber, $remarks, date("Y-m-d"), $_SESSION["user_id"]]);
+    create_notification_for_admins($pdo, $label, $quantity . " " . ($item["unit"] ?: "pcs") . " of " . $item["item_name"] . " was recorded for " . strtolower($type) . ".", "delivery", $_SESSION["user_id"]);
+    $pdo->commit();
+    json_response(["success" => true, "message" => $label . " recorded. It was added to Rejected Items and Stock Adjustment."]);
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    json_response(["success" => false, "message" => $e->getMessage()], 422);
+  }
+}
+
 if ($action === "record_delivery") {
   require_admin();
   $id = (int)post_value("id");
@@ -178,17 +250,6 @@ if ($action === "record_delivery") {
       && empty($d["receipt_confirmed_at"]);
     if ($isInventoryRequest && ($d["status"] ?? "") !== "Out for Delivery" && !$legacyDeliveredButUnconfirmed) {
       throw new Exception("Confirm Receipt is available only when the delivery status is Out for Delivery. Complete the shipment first if quantities are missing.");
-    }
-    // v11: The Inventory Item Master is NOT the authoritative supplier for a Procurement PO.
-    // Fail closed: never finalize a Procurement-linked receipt/rejection with an unverified supplier.
-    $procurementLinkedV11 = $isInventoryRequest
-      && strcasecmp(trim((string)($d["destination"] ?? "")), "Procurement") === 0;
-    $supplierFromPoV11 = null;
-    if ($procurementLinkedV11) {
-      $supplierFromPoV11 = inventoryPoSupplierV11(
-        trim((string)($d["po_number"] ?? "")),
-        trim((string)($d["request_number"] ?? ""))
-      );
     }
     $s = $pdo->prepare("SELECT id,approved_quantity,quantity,delivered_quantity FROM request_items WHERE request_id=? FOR UPDATE");
     $s->execute([$d["request_id"]]);
@@ -210,28 +271,15 @@ if ($action === "record_delivery") {
       $reason = trim((string)($it["rejection_reason"] ?? ""));
       if (!isset($expected[$ri]) || !is_numeric($raw) || ((string)$qty !== (string)$raw) || $qty < 0 || $qty > $expected[$ri] || $accepted < 0 || $rejected < 0 || $accepted + $rejected !== $qty || ((string)$accepted !== (string)$acceptedRaw) || ((string)$rejected !== (string)$rejectedRaw)) throw new Exception("Inspection quantities are invalid. Accepted + Rejected must equal Delivered, using whole numbers only.");
       if ($rejected > 0 && $reason === "") throw new Exception("Please provide a rejection reason for every rejected item.");
-      // Inventory-originated requests are received by Inventory immediately.
-      // Requests from Production/Sales stay unaccepted until that team confirms receipt.
       $acceptedForRequest = $isInventoryRequest ? $accepted : 0;
-      // Keep the received quantities and inventory ledger in sync. For an
-      // Inventory-originated request (Production -> Inventory), only accepted
-      // units are posted to on-hand stock; rejected units remain in Rejected Items.
       $qitem = $pdo->prepare("SELECT ri.item_id,ri.item_name,ri.size,ri.quantity,ri.unit,ri.warehouse_id,i.item_type,i.size item_master_size,i.supplier_name FROM request_items ri LEFT JOIN items i ON i.id=ri.item_id WHERE ri.id=? AND ri.request_id=? FOR UPDATE");
       $qitem->execute([$ri, $d["request_id"]]);
       $detail = $qitem->fetch();
       if (!$detail) throw new Exception("A requested item could not be found while saving the receipt.");
 
-      // Resolve Finished Goods by the size saved on the request line, not by
-      // the possibly stale/base item_id. This keeps Item Master, Stock In,
-      // Inventory balance and Stock Movement on the exact same size variant.
       $itemId = (int)($detail["item_id"] ?? 0);
       $requestedSize = trim((string)($detail["size"] ?? ""));
 
-      // Do not trust request_items.item_id to identify a shoe-size variant.
-      // Older requests and integrations may retain the base/first-size ID even
-      // though request_items.size contains the exact size ordered. Resolve the
-      // Finished Good variant by normalized item name + exact requested size
-      // before writing ANY inventory ledger entry.
       $isFinishedGood = strtolower(trim((string)($detail["item_type"] ?? ""))) === "finished good";
       if (!$isFinishedGood && $requestedSize !== "") {
         $fgExists = $pdo->prepare("SELECT 1 FROM items WHERE LOWER(TRIM(item_name))=LOWER(TRIM(?)) AND item_type='Finished Good' LIMIT 1");
@@ -266,8 +314,6 @@ if ($action === "record_delivery") {
         if ($itemId <= 0 || $warehouseId <= 0) {
           throw new Exception("The item or receiving warehouse is not linked correctly. Please check the request before confirming receipt.");
         }
-        // The stock-in ledger is the idempotency source: a repeated save must
-        // add only the newly accepted difference, never duplicate old receipt.
         $posted = $pdo->prepare("SELECT COALESCE(SUM(quantity),0) FROM stock_in WHERE reference_number=? AND item_id=? AND warehouse_id=?");
         $posted->execute([$d["request_number"], $itemId, $warehouseId]);
         $alreadyPosted = (int)$posted->fetchColumn();
@@ -301,7 +347,7 @@ if ($action === "record_delivery") {
 
     if (count($rejectedItems)) {
       $po = strtolower(trim((string)($d["destination"] ?? ""))) === "procurement" ? trim((string)($d["po_number"] ?? "")) : "";
-      $supplier = $procurementLinkedV11 ? $supplierFromPoV11 : trim((string)post_value("supplier_name"));
+      $supplier = trim((string)post_value("supplier_name"));
       $receivedDate = trim((string)post_value("received_date")) ?: date("Y-m-d");
       if ($supplier === "") $supplier = implode(", ", array_values(array_unique($supplierNames)));
       $find = $pdo->prepare("SELECT id FROM supplier_rejections WHERE delivery_id=?");
@@ -318,7 +364,27 @@ if ($action === "record_delivery") {
         $pdo->prepare("UPDATE supplier_rejections SET report_number=? WHERE id=?")->execute([$reportNumber, $rejectionId]);
       }
       $insReject = $pdo->prepare("INSERT INTO supplier_rejection_items(rejection_id,request_item_id,item_name,ordered_quantity,delivered_quantity,accepted_quantity,rejected_quantity,unit,rejection_reason) VALUES(?,?,?,?,?,?,?,?,?)");
-      foreach ($inspectionItems as $ri) $insReject->execute([$rejectionId, $ri["request_item_id"], $ri["item_name"], $ri["ordered_quantity"], $ri["delivered_quantity"], $ri["accepted_quantity"], $ri["rejected_quantity"], $ri["unit"], $ri["rejection_reason"]]);
+      foreach ($inspectionItems as $ri) {
+        $insReject->execute([$rejectionId, $ri["request_item_id"], $ri["item_name"], $ri["ordered_quantity"], $ri["delivered_quantity"], $ri["accepted_quantity"], $ri["rejected_quantity"], $ri["unit"], $ri["rejection_reason"]]);
+        if ($ri["rejected_quantity"] > 0) {
+          $detailQuery = $pdo->prepare("SELECT item_id,warehouse_id FROM request_items WHERE id=?");
+          $detailQuery->execute([$ri["request_item_id"]]);
+          $stockDetail = $detailQuery->fetch();
+          if ($stockDetail && (int)$stockDetail["item_id"] > 0 && (int)$stockDetail["warehouse_id"] > 0) {
+            $adjustmentNumber = "REJ-INS-" . $id . "-" . $ri["request_item_id"];
+            $existsAdjustment = $pdo->prepare("SELECT id FROM stock_adjustments WHERE adjustment_number=? LIMIT 1");
+            $existsAdjustment->execute([$adjustmentNumber]);
+            if (!$existsAdjustment->fetchColumn()) {
+              $stockQuery = $pdo->prepare("SELECT quantity FROM inventory WHERE item_id=? AND warehouse_id=?");
+              $stockQuery->execute([$stockDetail["item_id"], $stockDetail["warehouse_id"]]);
+              $currentStock = (int)$stockQuery->fetchColumn();
+              $remarks = "Rejected during delivery inspection; quantity " . $ri["rejected_quantity"] . " " . $ri["unit"] . "; not added to available stock.";
+              $pdo->prepare("INSERT INTO stock_adjustments(adjustment_number,item_id,warehouse_id,current_quantity,adjusted_quantity,difference,reason,remarks,date,user_id) VALUES(?,?,?,?,?,0,'Rejected Item',?,CURDATE(),?)")
+                ->execute([$adjustmentNumber, $stockDetail["item_id"], $stockDetail["warehouse_id"], $currentStock, $currentStock, $remarks, $_SESSION["user_id"]]);
+            }
+          }
+        }
+      }
     } else {
     }
 
@@ -332,9 +398,6 @@ if ($action === "record_delivery") {
       $target = $isInventory ? (int)$it["quantity"] : (int)$it["approved_quantity"];
       $del = (int)$it["delivered_quantity"];
       $accepted = (int)$it["inspection_accepted_quantity"];
-      // For Inventory-originated requests, receipt completion is based on the
-      // physical quantity recorded as delivered. Rejected units are still
-      // physically received and are tracked separately in Rejected Items.
       $balanceBasis = $isInventory ? $del : ($del > 0 ? $accepted : (int)$it["approved_quantity"]);
       $balance = max(0, (int)$it["quantity"] - $balanceBasis);
       $remainingTotal += $balance;
@@ -344,7 +407,6 @@ if ($action === "record_delivery") {
     if ($isInventory) {
       $status = ($allTargetsMet && $remainingTotal === 0) ? "Delivered" : ($anyDelivered ? "Partially Delivered" : "To Ship");
     } else {
-      // Inventory has physically sent the items. The requesting team must still accept them.
       $status = ($allTargetsMet && $anyDelivered) ? "Out for Delivery" : ($anyDelivered ? "Partially Delivered" : "To Ship");
     }
     $sets = "status=?,shipped_date=COALESCE(shipped_date,CURDATE()),out_for_delivery_date=COALESCE(out_for_delivery_date,CURDATE())";
@@ -372,50 +434,7 @@ if ($action === "record_delivery") {
       create_notification_for_user($pdo, "Partial Delivery", "Request {$d["request_number"]} has missing delivered quantities.", "delivery", $_SESSION["user_id"], $d["requested_by"]);
     }
     $pdo->commit();
-
-    // Notify Procurement after Inventory has safely saved its receipt.
-    // Same contract as api/requests.php accept_delivery: the DR is already
-    // committed above, so a failed callback never loses Inventory's data.
-    $confirmedRequestNumber = (string)$d["request_number"];
-    // Only Inventory-initiated, Procurement-destination requests belong to the
-    // Procurement PO receiving flow. The Procurement verifier rejects anything
-    // else (e.g. Production requests that merely carry a PO number), so skip
-    // the callback entirely for those instead of surfacing a failure toast.
-    $procurementFlow = strcasecmp(trim((string)($d["destination"] ?? "")), "Procurement") === 0
-        && strcasecmp(trim((string)($d["requester_team"] ?? "")), "Inventory") === 0;
-    $confirmedPoNumber = $procurementFlow ? trim((string)($d["po_number"] ?? "")) : "";
-    $procurementSynced = false;
-    $syncKey = (string)(getenv("IMS_API_KEY") ?: ($_SERVER["IMS_API_KEY"] ?? ""));
-    $syncUrl = (string)(getenv("PROCUREMENT_RECEIPT_SYNC_URL") ?: ($_SERVER["PROCUREMENT_RECEIPT_SYNC_URL"] ?? "http://127.0.0.1/ITPROFEL/PROCUREMENT/database/inventory-receipt-confirmed.php"));
-    if ($syncKey !== "" && function_exists("curl_init") && $confirmedPoNumber !== "") {
-      $syncCurl = curl_init($syncUrl);
-      if ($syncCurl !== false) {
-        curl_setopt_array($syncCurl, [
-          CURLOPT_RETURNTRANSFER => true,
-          CURLOPT_POST => true,
-          CURLOPT_POSTFIELDS => json_encode(["request_number"=>$confirmedRequestNumber,"po_number"=>$confirmedPoNumber]),
-          CURLOPT_CONNECTTIMEOUT => 3,
-          CURLOPT_TIMEOUT => 8,
-          CURLOPT_FOLLOWLOCATION => false,
-          CURLOPT_HTTPHEADER => ["Content-Type: application/json", "Accept: application/json", "X-API-Team: Inventory", "X-API-Key: ".$syncKey],
-          CURLOPT_COOKIE => "",
-          CURLOPT_PROXY => ""
-        ]);
-        $syncBody = curl_exec($syncCurl);
-        $syncCode = (int)curl_getinfo($syncCurl, CURLINFO_HTTP_CODE);
-        curl_close($syncCurl);
-        $syncJson = is_string($syncBody) ? json_decode($syncBody, true) : null;
-        $procurementSynced = $syncCode >= 200 && $syncCode < 300 && is_array($syncJson) && ($syncJson["success"] ?? false) === true;
-      }
-    }
-    $syncNote = ($confirmedPoNumber !== "" && !$procurementSynced)
-      ? " Inventory receipt is saved, but Procurement status sync failed. Check the Procurement API URL and shared API key."
-      : "";
-    $baseMessage = count($rejectedItems) ? "Delivery inspection saved. Rejected items were added to Rejected Items." : ($isInventory ? ($status === "Delivered" ? "Inventory received the complete request. Accepted quantities were posted to Stock In, Inventory balance, and Stock Movement; rejected quantities remain in Rejected Items." : "Inventory receipt saved. Accepted quantities were posted to Stock In and Stock Movement; rejected quantities remain separate. Remaining Balance is reflected as Partially Delivered.") : ("Delivery recorded. Status is " . $status . "; the requesting team can confirm receipt when the approved quantities arrive."));
-    if (!$anyDelivered) {
-      $baseMessage = "No delivered quantities were entered, so the status stayed " . $status . ". Enter the delivered quantity in the modal (it is pre-filled with the approved quantity) to confirm the delivery.";
-    }
-    json_response(["success" => true, "status" => $status, "message" => $baseMessage . $syncNote, "procurement_synced" => $procurementSynced, "po_number" => $confirmedPoNumber]);
+    json_response(["success" => true, "status" => $status, "message" => count($rejectedItems) ? "Delivery inspection saved. Rejected items were added to Rejected Items." : ($isInventory ? ($status === "Delivered" ? "Inventory received the complete request. Accepted quantities were posted to Stock In, Inventory balance, and Stock Movement; rejected quantities remain in Rejected Items." : "Inventory receipt saved. Accepted quantities were posted to Stock In and Stock Movement; rejected quantities remain separate. Remaining Balance is reflected as Partially Delivered.") : ("Delivery recorded. Status is " . $status . "; the requesting team can confirm receipt when the approved quantities arrive."))]);
   } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     json_response(["success" => false, "message" => $e->getMessage()], 422);

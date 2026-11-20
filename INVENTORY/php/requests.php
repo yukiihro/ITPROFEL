@@ -52,8 +52,6 @@ function resolve_request_inventory_item($pdo, $requestItem, $destination = "")
 
     if ($requestedName === "") return null;
 
-    // Match the real item name/size first. Integrated teams can use different
-    // item IDs and their item type may not follow this system's destination rule.
     $base = "SELECT id,item_name,item_code,item_type,size,unit FROM items
              WHERE status='Active' AND LOWER(TRIM(item_name))=LOWER(TRIM(?))";
     $params = [$requestedName];
@@ -64,7 +62,6 @@ function resolve_request_inventory_item($pdo, $requestItem, $destination = "")
     $matches = $q->fetchAll();
     if (count($matches) === 1) return $matches[0];
 
-    // If the name is duplicated, use the expected item type to disambiguate.
     if ($expectedType !== "") {
         $typedParams = [$requestedName, $expectedType];
         $typedSql = "SELECT id,item_name,item_code,item_type,size,unit FROM items
@@ -80,7 +77,6 @@ function resolve_request_inventory_item($pdo, $requestItem, $destination = "")
         if (count($typedMatches) === 1) return $typedMatches[0];
     }
 
-    // ID is a final fallback only if its item name and requested size match.
     if ($requestedId > 0) {
         $sql = "SELECT id,item_name,item_code,item_type,size,unit FROM items
                 WHERE id=? AND status='Active'
@@ -190,7 +186,6 @@ if ($action === "approval_options") {
     json_response(["success" => true, "request" => $req, "items" => $items, "warehouses" => $warehouses]);
 }
 
-// Create a separate follow-up request containing only the unapproved balance.
 if ($action === "send_remaining") {
     $id = (int)post_value("id");
     $pdo->beginTransaction();
@@ -213,7 +208,6 @@ if ($action === "send_remaining") {
         }
         if (!$remainingItems) throw new Exception("There is no remaining balance to send.");
 
-        // Prevent duplicate follow-up requests if the button is clicked more than once.
         $markerText = "Remaining balance for " . $original["request_number"];
         $q = $pdo->prepare("SELECT id,request_number FROM requests WHERE requested_by=? AND remarks=? LIMIT 1");
         $q->execute([(int)$_SESSION["user_id"], $markerText]);
@@ -300,8 +294,6 @@ if ($action === "send_remaining_delivery") {
         }
         if ($remainingTotal <= 0) throw new Exception("There is no remaining quantity to send.");
 
-        // Continue the existing delivery. Keep its request, items and quantities;
-        // the next delivery entry will update cumulative delivered quantities.
         $pdo->prepare(
             "UPDATE deliveries
              SET status='To Ship',
@@ -363,9 +355,6 @@ if ($action === "create" || $action === "update") {
         if ($expectedType === "Raw Material") {
             $size = "";
         } else {
-            // The request form selects a model and a size separately. Stock is
-            // tracked against the size-specific Item Master row, so never keep
-            // the initially selected model-row ID when another size was chosen.
             $variant = $pdo->prepare(
                 "SELECT id FROM items
                  WHERE status='Active'
@@ -519,7 +508,6 @@ if ($action === "approve") {
                 ensure_request_delivery($pdo, $id, $req["expected_receive_date"]);
                 $requesterTeam = strtolower(trim((string)infer_requester_team($pdo, $req["requested_by"] ?? 0)));
                 if ($requesterTeam !== "inventory") {
-                    // Approval only queues the request. Inventory must explicitly confirm delivery.
                     $pdo->prepare(
                         "UPDATE request_items
                          SET delivered_quantity=0,
@@ -555,7 +543,7 @@ if ($action === "accept_delivery") {
     $deliveryId = (int)post_value("id");
     $pdo->beginTransaction();
     try {
-        $s = $pdo->prepare("SELECT d.*,r.request_number,r.requested_by,r.requester_team,r.destination,r.recipient_gmail FROM deliveries d JOIN requests r ON r.id=d.request_id WHERE d.id=? FOR UPDATE");
+        $s = $pdo->prepare("SELECT d.*,r.request_number,r.requested_by,r.destination,r.recipient_gmail FROM deliveries d JOIN requests r ON r.id=d.request_id WHERE d.id=? FOR UPDATE");
         $s->execute([$deliveryId]);
         $d = $s->fetch();
         if (!$d) throw new Exception("Delivery not found.");
@@ -573,7 +561,6 @@ if ($action === "accept_delivery") {
         $receiverQuery = $pdo->prepare("SELECT full_name FROM users WHERE id=? LIMIT 1");
         $receiverQuery->execute([$_SESSION["user_id"]]);
         $receiver = (string)$receiverQuery->fetchColumn();
-        // A complete physical shipment becomes Delivered after receipt confirmation.
         $newStatus = "Delivered";
         $pdo->prepare("UPDATE deliveries SET status=?,delivered_date=COALESCE(delivered_date,CURDATE()),received_date=CURDATE() WHERE id=?")->execute([$newStatus, $deliveryId]);
         $receiptCheck = $pdo->prepare("SELECT id FROM delivery_receipts WHERE delivery_id=? LIMIT 1");
@@ -589,19 +576,11 @@ if ($action === "accept_delivery") {
         create_notification_for_team($pdo, $d["destination"] ?? "", "Delivery Accepted", "Delivery {$d["request_number"]} was confirmed by {$receiver}. Status: {$newStatus}.", "delivery", $_SESSION["user_id"]);
         $confirmedRequestNumber = (string)$d["request_number"];
         $confirmedPoNumber = "";
-        // Only Inventory-initiated, Procurement-destination requests belong to
-        // the Procurement PO receiving flow. Production requests that carry a
-        // PO number are rejected by the Procurement verifier (destination /
-        // requester mismatch), so skip the callback for them entirely.
-        if (strcasecmp(trim((string)($d["destination"] ?? "")), "Procurement") === 0
-            && strcasecmp(trim((string)($d["requester_team"] ?? "")), "Inventory") === 0) {
-            $poLookup = $pdo->prepare("SELECT po_number FROM requests WHERE id=? LIMIT 1");
-            $poLookup->execute([(int)$d["request_id"]]);
-            $confirmedPoNumber = (string)$poLookup->fetchColumn();
-        }
+        $poLookup = $pdo->prepare("SELECT po_number FROM requests WHERE id=? LIMIT 1");
+        $poLookup->execute([(int)$d["request_id"]]);
+        $confirmedPoNumber = (string)$poLookup->fetchColumn();
         $pdo->commit();
 
-        // Notify Procurement after Inventory has safely saved its receipt.
         $procurementSynced = false;
         $syncKey = (string)(getenv("IMS_API_KEY") ?: ($_SERVER["IMS_API_KEY"] ?? ""));
         $syncUrl = (string)(getenv("PROCUREMENT_RECEIPT_SYNC_URL") ?: ($_SERVER["PROCUREMENT_RECEIPT_SYNC_URL"] ?? "http://127.0.0.1/ITPROFEL/PROCUREMENT/database/inventory-receipt-confirmed.php"));

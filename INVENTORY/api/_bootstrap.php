@@ -3,10 +3,7 @@ require_once __DIR__ . "/config.php";
 
 require_once __DIR__ . "/../php/database.php";
 
-/*
- * Backward-compatible alias for Production builds that still call the
- * older incoming-request notification helper name.
- */
+
 if (!function_exists("create_incoming_request_notifications")) {
     function create_incoming_request_notifications(...$args) {
         if (!function_exists("notify_request_participants")) {
@@ -140,9 +137,6 @@ function api_delivery_status($pdo, $request) {
     $inventoryRequest = $team === "inventory";
 
     if ($inventoryRequest) {
-        // For requests created by Inventory, Production's API delivery report
-        // represents the shipment event. Quality review alone must not change
-        // the status; only delivered_quantity sent by Production does that.
         if (!empty($request["receipt_confirmed_at"]) || !empty($request["received_date"])) {
             return "Delivered";
         }

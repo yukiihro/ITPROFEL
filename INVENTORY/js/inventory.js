@@ -1,17 +1,4 @@
 var InventoryApp = (function () {
-  // Hide admin-only controls before first paint: staff accounts must never
-  // see them flash and then vanish after the session check. session()
-  // re-shows them for controller / manager / admin accounts. A remembered
-  // "can control" flag keeps the sidebar from bouncing (menu items popping
-  // in and shifting the list) on every navigation for admins; logout clears
-  // it, and the session check still has the final say each load.
-  var rememberedAdmin = false;
-  try { rememberedAdmin = localStorage.getItem("imsCanControl") === "1"; } catch (e) {}
-  if (!rememberedAdmin) {
-    document.querySelectorAll(".admin-only").forEach(function (el) {
-      el.style.display = "none";
-    });
-  }
   function encode(data) {
     var a = [];
     for (var k in data) {
@@ -206,9 +193,6 @@ var InventoryApp = (function () {
     request("php/check-session.php", {}, "GET", function (r) {
       if (!r.logged_in) {
         // Inventory has no own login page — sign in via the universal login.
-        try {
-          localStorage.removeItem("imsCanControl");
-        } catch (e) {}
         location.href = "../root/index.php";
         return;
       }
@@ -217,13 +201,6 @@ var InventoryApp = (function () {
         .trim()
         .toUpperCase();
       var canControl = !!user.can_control;
-      // Remember for next load so admin-only menu items are visible at first
-      // paint and the sidebar never bounces (items popping in and shifting
-      // the list). Cleared on logout; the session check still has the final
-      // say on every page load.
-      try {
-        localStorage.setItem("imsCanControl", canControl ? "1" : "0");
-      } catch (e) {}
       var name = String(user.full_name || user.username || "Employee").trim();
       var position = String(user.position || "").trim();
       var u = document.getElementById("userName");
@@ -238,9 +215,7 @@ var InventoryApp = (function () {
         u.style.display = "inline-flex";
         u.setAttribute("data-role-label", position || role);
       }
-      // Effective privilege class: controller/manager/admin-position accounts
-      // (can_control) act as ADMIN everywhere admin-only UI is gated on this.
-      document.body.dataset.role = canControl ? "ADMIN" : role;
+      document.body.dataset.role = role;
       document.body.dataset.canControl = canControl ? "1" : "0";
       var a = document.getElementById("avatar");
       if (a) a.remove();
@@ -253,7 +228,7 @@ var InventoryApp = (function () {
           el.style.display = canControl ? "" : "none";
         });
       setupNotifications();
-      r.user.role = canControl ? "ADMIN" : role;
+      r.user.role = role;
       r.user.can_control = canControl;
       callback(r);
     });
@@ -296,48 +271,17 @@ var InventoryApp = (function () {
       };
     var mob = document.getElementById("mobileMenu"),
       side = document.getElementById("sidebar");
-    // Off-canvas sidebar (≤760px only): the hamburger opens it over a scrim
-    // so it can always be closed, and choosing a menu item closes it.
-    var backdrop = null;
-    function closeSidebar() {
-      if (side) side.classList.remove("open");
-      if (backdrop) {
-        backdrop.remove();
-        backdrop = null;
-      }
-    }
-    if (mob && side)
+    if (mob)
       mob.onclick = function () {
-        if (side.classList.contains("open")) {
-          closeSidebar();
-          return;
-        }
-        side.classList.add("open");
-        backdrop = document.createElement("div");
-        backdrop.className = "sidebar-backdrop";
-        backdrop.onclick = closeSidebar;
-        document.body.appendChild(backdrop);
+        side.classList.toggle("open");
       };
-    // On narrow screens the sidebar is off-canvas: choosing a menu item
-    // should close it (the next page loads with it closed anyway).
-    if (side)
-      side.querySelectorAll("a[href]").forEach(function (a) {
-        if (a.id !== "logoutBtn")
-          a.addEventListener("click", function () {
-            closeSidebar();
-          });
-      });
     var logout = document.getElementById("logoutBtn");
     if (logout)
       logout.onclick = function (e) {
         e.preventDefault();
-        request("php/logout.php", {}, "POST", function () {
-          // Forget the remembered admin state so the next login starts
-          // from the safe default (admin links hidden until verified).
-          try {
-            localStorage.removeItem("imsCanControl");
-          } catch (e2) {}
-          // Back to the universal login (this also ends the shared session).
+        // End the shared D.E.V.S session (audit + all module sessions) via
+        // the universal logout endpoint, then return to the universal login.
+        request("../root/api.php?action=logout", {}, "POST", function () {
           location.href = "../root/index.php";
         });
       };
@@ -1260,7 +1204,6 @@ var InventoryApp = (function () {
           });
           document.getElementById("lowCount").textContent =
             data.length + " alerts";
-          // Keep the five table cells in exactly the same order as the five headers.
           document.getElementById("lowStockTable").innerHTML =
             data
               .map(function (x) {

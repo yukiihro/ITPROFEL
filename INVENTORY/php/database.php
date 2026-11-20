@@ -483,7 +483,7 @@ function ensure_inventory_ledger_reconciliation(PDO $pdo)
         }
 
 
-        $pdo->exec("INSERT IGNORE INTO inventory(item_id,warehouse_id,quantity) SELECT i.id,w.id,0 FROM items i CROSS JOIN warehouses w");
+        $pdo->exec("INSERT INTO inventory(item_id,warehouse_id,quantity) SELECT i.id,w.id,0 FROM items i CROSS JOIN warehouses w ON DUPLICATE KEY UPDATE quantity=quantity");
         $pdo->exec("UPDATE inventory inv LEFT JOIN (SELECT item_id,warehouse_id,SUM(CASE WHEN movement_type IN ('STOCK IN','STOCK TRANSFER IN','SALES RETURN') THEN quantity WHEN movement_type IN ('STOCK OUT','STOCK TRANSFER OUT') THEN -quantity WHEN movement_type='STOCK ADJUSTMENT' THEN quantity ELSE 0 END) balance FROM stock_movements GROUP BY item_id,warehouse_id) ledger ON ledger.item_id=inv.item_id AND ledger.warehouse_id=inv.warehouse_id SET inv.quantity=COALESCE(ledger.balance,0)");
         mark_migration_done($pdo, 'inventory_ledger_reconciliation_v1');
         $pdo->commit();
@@ -616,15 +616,11 @@ function ensure_sales_return_tables(PDO $pdo)
         CONSTRAINT fk_sales_return_item_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
     ) ENGINE=InnoDB");
 
-    // CREATE TABLE IF NOT EXISTS does not update an older table. Keep existing
-    // installations compatible by adding the receiver fields when missing.
     $salesReturnColumns = [];
     $columnQuery = $pdo->query("SHOW COLUMNS FROM sales_returns");
     foreach ($columnQuery->fetchAll(PDO::FETCH_ASSOC) as $column) {
         $salesReturnColumns[$column['Field']] = true;
     }
-    // Older installations may have created sales_returns before audit timestamps
-    // were introduced. Add every column used by the list and receiving workflow.
     if (!isset($salesReturnColumns['created_at'])) {
         $pdo->exec("ALTER TABLE sales_returns ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
     }

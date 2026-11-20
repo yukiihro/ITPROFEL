@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const FIN_REFRESHABLE_PAGES = [
         'dashboard', 'chartAccounts', 'payables', 'receivables', 'cashBank',
         'expenses', 'financialReports', 'financialTransactions',
-        'paymentManagement', 'bankReconciliation'
+        'paymentManagement'
     ];
 
     async function refreshOpenFinancePage() {
@@ -393,7 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
         financialReports: 'finFinancialReports',
         paymentManagement: 'finPaymentManagement',
         financialTransactions: 'finFinancialTransactions',
-        bankReconciliation: 'finBankReconciliation',
         auditTrail: 'finAuditTrail',
         support: 'finSupport',
         settings: 'finSettings'
@@ -667,7 +666,6 @@ document.addEventListener('DOMContentLoaded', () => {
         '.exd-table-scroll',
         '.pmh-table-wrap',
         '.receivables-table-inner',
-        '.bank-recon-scroll',
         '.fin-report-preview'
     ].join(', ');
 
@@ -3723,7 +3721,6 @@ document.addEventListener('DOMContentLoaded', () => {
         financialReports: { title: 'Financial Reports',     subtitle: 'Compare revenue, expenses, and net position.',        build: buildFinancialReports },
         paymentManagement: { title: 'Payment Management',  subtitle: 'Review and manage outgoing payments.',                 build: buildPaymentManagement },
         financialTransactions: { title: 'Financial Transactions', subtitle: 'Review the latest financial activity.',          build: buildFinancialTransactions },
-        bankReconciliation: { title: 'Bank Reconciliation', subtitle: 'Compare book balance against bank statement.',     build: buildBankReconciliationPage },
         auditTrail:       { title: 'Audit Trail',           subtitle: 'Review system activity and user actions.',          build: buildAuditTrail },
         notifications:    { title: 'Notifications',         subtitle: 'All change notifications in one place.',             build: buildNotificationsPage },
         settings:         { title: 'Settings',             subtitle: 'Configure finance preferences.',                       build: buildSettings },
@@ -6223,7 +6220,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h3>Cash / Bank Accounts</h3>
                     <div class="cash-accounts-actions">
                         ${canManageRecords() ? '<button class="coa-add-btn-top" type="button" id="addCbBtn">+ Add Entry</button>' : ''}
-                        <button class="btn btn-sm" type="button" id="bankReconciliationBtn" style="background:#fff; color:#c2181a; border:1px solid #f0d0d0; border-radius:6px; font-weight:600;">Bank Reconciliation</button>
                     </div>
                 </div>
 
@@ -6333,85 +6329,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </section>
             </div>
         `;
-    }
-
-    function openBankReconciliation() {
-        const fmt = (n) => Number(n).toLocaleString('en-PH');
-
-        // One row per bank account (same grouping as the Cash/Bank table)
-        const accountMap = new Map();
-        (store.cashBank || []).filter(r => !/cash/i.test(r.account)).forEach(r => accountMap.set(r.account, r));
-        const accounts = [...accountMap.values()];
-
-        const rowsHtml = accounts.map((a, i) => `
-            <div class="bank-recon-row" data-idx="${i}">
-                <span>${escapeHtml(a.account)}</span>
-                <span>${fmt(Number(a.balance || 0))}</span>
-                <span><input class="bank-recon-input" type="number" min="0" step="0.01" name="stmt-${i}" value="${a.statementBalance ?? ''}" aria-label="Statement balance for ${escapeHtml(a.account)}" /></span>
-                <span class="recon-diff">—</span>
-                <span class="recon-status">—</span>
-            </div>
-        `).join('');
-
-        openModal({
-            title: ' ',
-            size: 'md',
-            onCancel: closeModal,
-            onSubmit: (form) => {
-                let entered = 0, review = 0;
-                accounts.forEach((a, i) => {
-                    const raw = form.querySelector(`[name="stmt-${i}"]`)?.value;
-                    if (raw === '' || raw == null) return;
-                    entered++;
-                    a.statementBalance = Number(raw);
-                    if (Math.abs(a.statementBalance - Number(a.balance || 0)) >= 0.005) review++;
-                });
-                if (!entered) { toast('Enter at least one statement balance.', 'info'); return; }
-                saveStore();
-                if (review === 0) toast('Bank account reconciled successfully.', 'success');
-                else toast(`${review} account${review > 1 ? 's' : ''} need review.`, 'info');
-                closeModal();
-            },
-            body: `
-                <form id="bankReconciliationForm" novalidate>
-                    <div class="bank-recon-modal-title">Bank Reconciliation</div>
-                    ${accounts.length ? `
-                    <div class="bank-recon-scroll">
-                        <div class="bank-recon-head">
-                            <span>Account</span>
-                            <span>System Balance</span>
-                            <span>Balance Statement</span>
-                            <span>Difference</span>
-                            <span>Status</span>
-                        </div>
-                        <div class="bank-recon-body">${rowsHtml}</div>
-                    </div>` : `<div class="empty-state"><p>No bank accounts to reconcile.</p></div>`}
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-subtle" data-act="cancel">Cancel</button>
-                        ${accounts.length ? '<button type="submit" class="btn btn-primary">Reconcile</button>' : ''}
-                    </div>
-                </form>
-            `
-        });
-
-        const modalEl = document.getElementById('modal');
-        if (modalEl) modalEl.className = 'modal bank-recon-modal';
-
-        // Live difference / status
-        const update = (rowEl) => {
-            const a = accounts[Number(rowEl.dataset.idx)];
-            const raw = rowEl.querySelector('.bank-recon-input').value;
-            const diffEl = rowEl.querySelector('.recon-diff');
-            const statusEl = rowEl.querySelector('.recon-status');
-            if (raw === '') { diffEl.textContent = '—'; statusEl.textContent = '—'; return; }
-            const diff = Number(raw) - Number(a.balance || 0);
-            diffEl.textContent = fmt(Math.abs(diff) < 0.005 ? 0 : diff);
-            statusEl.textContent = Math.abs(diff) < 0.005 ? 'Reconciled' : 'Review';
-        };
-        document.querySelectorAll('#bankReconciliationForm .bank-recon-row').forEach(rowEl => {
-            update(rowEl);
-            rowEl.querySelector('.bank-recon-input').addEventListener('input', () => update(rowEl));
-        });
     }
 
     function renderCashBankRows() {
@@ -7819,59 +7736,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* -------------------- SETTINGS / ACCOUNT / LOGOUT -------------------- */
 
-    function buildBankReconciliationPage() {
-        const accounts = (store.cashBank || []).filter(r => !/cash/i.test(r.account));
-
-        if (!accounts.length) {
-            return `
-                <div class="bank-recon-page-card">
-                    <div class="bank-recon-page-header">
-                        <h2>Bank Reconciliation</h2>
-                    </div>
-                    <div class="empty-state">
-                        <p>No bank accounts to reconcile.</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        const rows = accounts.map(a => {
-            const sysBal = Number(a.balance || 0);
-            const stmtBal = Number(a.statementBalance ?? sysBal);
-            const diff = stmtBal - sysBal;
-            const status = Math.abs(diff) < 0.005 ? 'Reconciled' : 'Review';
-            const formatNum = (num) => num.toLocaleString('en-PH');
-
-            return `<div class="bank-recon-row">
-                <span>${escapeHtml(a.account)}</span>
-                <span>${formatNum(sysBal)}</span>
-                <span>${formatNum(stmtBal)}</span>
-                <span>${formatNum(diff)}</span>
-                <span class="recon-status ${status === 'Reconciled' ? '' : 'is-review'}">${status}</span>
-            </div>`;
-        }).join('');
-
-        return `
-            <div class="bank-recon-page-card">
-                <div class="bank-recon-page-header">
-                    <h2>Bank Reconciliation</h2>
-                </div>
-                <div class="bank-recon-scroll">
-                    <div class="bank-recon-head">
-                        <span>Account</span>
-                        <span>System Balance</span>
-                        <span>Balance Statement</span>
-                        <span>Difference</span>
-                        <span>Status</span>
-                    </div>
-                    <div class="bank-recon-body">
-                        ${rows}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
     let atCurrentPage = 1;
     const AT_ROWS_PER_PAGE = 10;
 
@@ -8229,13 +8093,88 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    const GUIDE_ICON = (paths) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+
+    const FIN_GUIDE_LINKS = [
+        { page: 'dashboard', icon: GUIDE_ICON('<path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/>'), title: 'Dashboard', text: 'Today’s finance activity in one snapshot.' },
+        { page: 'chartAccounts', icon: GUIDE_ICON('<path d="M4 5h16v14H4z"/><path d="M8 5v14"/><path d="M12 9h5M12 13h5"/>'), title: 'Chart of Accounts', text: 'Account codes, types, and current balances.' },
+        { page: 'payables', icon: GUIDE_ICON('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>'), title: 'Accounts Payable', text: 'Supplier bills, due dates, and payments.' },
+        { page: 'receivables', icon: GUIDE_ICON('<path d="M4 19V7l8-4 8 4v12"/><path d="M9 19v-6h6v6"/>'), title: 'Accounts Receivable', text: 'Customer invoices and collections.' },
+        { page: 'cashBank', icon: GUIDE_ICON('<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 11h20"/><path d="M6 15h4"/>'), title: 'Cash / Bank', text: 'Cash movements and bank balances.' },
+        { page: 'expenses', icon: GUIDE_ICON('<path d="M12 2v20"/><path d="M17 6H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H7"/>'), title: 'Expenses', text: 'Review, approve, and pay expenses.' },
+        { page: 'quotations', icon: GUIDE_ICON('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>'), title: 'Quotations', text: 'Requests sent over from Procurement.' },
+        { page: 'financialReports', icon: GUIDE_ICON('<path d="M4 20V10M10 20V4M16 20v-7M2 20h20"/>'), title: 'Financial Reports', text: 'Revenue, expenses, and net position.' },
+        { page: 'paymentManagement', icon: GUIDE_ICON('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h3"/>'), title: 'Payment Management', text: 'Outgoing payments in one place.' },
+        { page: 'financialTransactions', icon: GUIDE_ICON('<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'), title: 'Financial Transactions', text: 'The full record of money movement.' },
+        { page: 'auditTrail', icon: GUIDE_ICON('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'), title: 'Audit Trail', text: 'Who changed what, and when.' },
+        { page: 'notifications', icon: GUIDE_ICON('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>'), title: 'Notifications', text: 'Updates from across the finance team.' }
+    ];
+
+    const FIN_GUIDE_FAQS = [
+        { q: 'How do I get started in Finance?', a: 'Use the sidebar to move between pages. The Dashboard shows a snapshot of today’s activity. The bell in the top bar lists recent changes; click one to jump straight to that page.' },
+        { q: 'Where do Procurement bills appear?', a: 'When Procurement posts an approved invoice, it appears in Accounts Payable as Unpaid. Open the bill and choose Pay to settle it — the payment is recorded in Financial Transactions.' },
+        { q: 'How does Production costing reach Finance?', a: 'When Production sends a costing, Finance records one Production transaction and one Accounts Payable bill per order, under the supplier “Production Department”. Each order appears only once.' },
+        { q: 'How do I pay a bill?', a: 'Open Accounts Payable, find the bill, and choose Pay. Select the cash or bank account to pay from. The bill changes to Paid and a matching transaction is recorded.' },
+        { q: 'What is the Chart of Accounts for?', a: 'It lists every account code and type. The Accounts Payable balance shown there counts only bills still owed, so bills already Paid are excluded.' },
+        { q: 'What is the difference between Receivables and Payables?', a: 'Receivables are customer invoices waiting to be collected. Payables are supplier bills waiting to be paid.' },
+        { q: 'How do expenses get approved?', a: 'Open Expenses and choose Approve or Reject on a pending item. Approved items can then be marked Paid. The statuses you will see are Pending, Approved, Rejected, and Paid.' },
+        { q: 'Where do payroll payments show up?', a: 'When HR pays a payroll, the payment is recorded in Financial Transactions and the Payroll Transaction Record shows that payroll as Paid.' },
+        { q: 'How do I check the DEVS Bank Account balance?', a: 'Open Cash / Bank. The DEVS Bank Account starts with an opening balance of ₱100,000.00 and changes as money moves in or out.' },
+        { q: 'How do I run a financial report?', a: 'Open Financial Reports, choose the date range and any filters, then preview or print. The figures come from the transactions already recorded in the system.' },
+        { q: 'A page is missing from my sidebar. What do I do?', a: 'Page visibility is controlled by an HR Administrator in User Permission. Ask them to grant you access to the page you need.' },
+        { q: 'I forgot my password. Who can reset it?', a: 'Ask an HR Administrator to reset it from Account Management. You will need the new password to sign in again.' },
+        { q: 'How can I tell who changed a record?', a: 'Open Audit Trail. It lists who changed what and when. The notification bell is built from the same activity log.' }
+    ];
+
     function buildSupportPage() {
+        const profile = JSON.parse(localStorage.getItem('devs_profile') || '{}');
+        const me = profile.fullName || profile.email || 'there';
+        const links = FIN_GUIDE_LINKS.map(link => `
+            <a href="#" class="guide-link" data-goto-page="${link.page}">
+                <span class="guide-link-icon">${link.icon}</span>
+                <h3>${escapeHtml(link.title)}</h3>
+                <p>${escapeHtml(link.text)}</p>
+                <span class="guide-link-go">Open page →</span>
+            </a>
+        `).join('');
+        const faqs = FIN_GUIDE_FAQS.map((item, i) => `
+            <details class="guide-faq-item" data-guide-faq="${i}">
+                <summary>${escapeHtml(item.q)}</summary>
+                <p>${escapeHtml(item.a)}</p>
+            </details>
+        `).join('');
+
         return `
-            <div class="section-title"><h2>Support</h2></div>
-            <div class="empty-state" style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);">
-                <div class="empty-icon">🛠</div>
-                <strong>No support at the moment</strong>
-                <p>There is no support available right now. Please check back later.</p>
+            <div class="section-title"><h2>Support</h2><span class="hint">System guide and quick answers</span></div>
+            <div class="guide-wrap">
+                <section class="card guide-intro">
+                    <span class="guide-intro-icon">${GUIDE_ICON('<path d="M12 3 3 7v5c0 5 3.8 8.4 9 9 5.2-.6 9-4 9-9V7z"/><path d="m9 12 2 2 4-4"/>')}</span>
+                    <div>
+                        <p class="guide-eyebrow">D.E.V.S · FINANCE</p>
+                        <h2>System Guide</h2>
+                        <p>A short guide to the Finance portal: where each record lives, how bills and payments move through the system, and what to do when something looks wrong. Pick a page below or search the questions.</p>
+                    </div>
+                </section>
+
+                <div class="guide-grid">${links}</div>
+
+                <section class="card guide-panel">
+                    <div class="guide-panel-head">
+                        <h3>Frequently asked questions</h3>
+                        <p>Type a word to narrow the list. Click a question to expand the answer.</p>
+                    </div>
+                    <div class="guide-search">
+                        ${GUIDE_ICON('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>')}
+                        <input type="search" id="guideSearch" placeholder="Search the guide…" aria-label="Search guide questions" autocomplete="off" />
+                    </div>
+                    <div class="guide-faq" id="guideFaqList">${faqs}</div>
+                    <div class="guide-faq-empty" id="guideFaqEmpty" hidden>No topics match your search. Try a different word.</div>
+                </section>
+
+                <section class="card guide-help">
+                    <h3>Still need help?</h3>
+                    <p>Contact your HR Administrator with the page name and a short description of the issue. Signed in as <strong>${escapeHtml(me)}</strong>.</p>
+                </section>
             </div>
         `;
     }
@@ -8455,7 +8394,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }), 100));
             bindFinPagination('#cbInFlowPagination', 'cbIn', guard(renderCashFlowRows));
             bindFinPagination('#cbOutFlowPagination', 'cbOut', guard(renderCashFlowRows));
-            $('#bankReconciliationBtn')?.addEventListener('click', guard(openBankReconciliation));
             $('#addCbBtn')?.addEventListener('click', (e) => {
                 if (!lockElement(e.currentTarget, 500)) return;
                 guard(() => openCashBankForm())();
@@ -8695,8 +8633,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         }
 
-        if (page === 'bankReconciliation') {
-            $('#newReconciliationBtn')?.addEventListener('click', guard(openBankReconciliation));
+        if (page === 'support') {
+            const input = $('#guideSearch');
+            const items = $$('#guideFaqList .guide-faq-item');
+            const empty = $('#guideFaqEmpty');
+            const applyGuideSearch = () => {
+                const term = (input?.value || '').trim().toLowerCase();
+                let shown = 0;
+                items.forEach(item => {
+                    const hit = !term || item.textContent.toLowerCase().includes(term);
+                    item.style.display = hit ? '' : 'none';
+                    if (hit) shown++;
+                });
+                if (empty) empty.hidden = shown > 0;
+            };
+            input?.addEventListener('input', throttle(guard(applyGuideSearch), 100));
+            $$('.guide-link[data-goto-page]').forEach(card => {
+                const target = card.dataset.gotoPage;
+                if (!pages[target] || !canAccessPage(target)) {
+                    card.style.display = 'none';
+                    return;
+                }
+                card.addEventListener('click', guard((e) => {
+                    e.preventDefault();
+                    $$('.nav-item').forEach(link => link.classList.remove('active'));
+                    const navLink = document.querySelector(`.nav-item[data-page="${target}"]`);
+                    if (navLink) navLink.classList.add('active');
+                    localStorage.setItem('devs_last_page', target);
+                    renderPage(target);
+                }));
+            });
         }
 
         if (page === 'settings') {

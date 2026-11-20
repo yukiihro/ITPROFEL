@@ -42,7 +42,7 @@ unset($_SESSION['redirect_guard']);
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>D.E.V.S · Finance Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=20261119receipt1">
+    <link rel="stylesheet" href="style.css?v=20261120guide1">
   <link rel="stylesheet" href="procurement_ap_inbox.css?v=3">
 </head>
 <body>
@@ -90,9 +90,6 @@ unset($_SESSION['redirect_guard']);
                 <a href="#" class="nav-item" data-page="financialTransactions">
                     <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg></span>
                     Financial Transactions</a>
-                <a href="#" class="nav-item" data-page="bankReconciliation">
-                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-2 7-2s5 2 7 2h2"/></svg></span>
-                    Bank Reconciliation</a>
                 <a href="#" class="nav-item" data-page="auditTrail">
                     <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6"/></svg></span>
                     Audit Trail</a>
@@ -191,7 +188,7 @@ unset($_SESSION['redirect_guard']);
 
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
-    <script src="functions.js?v=20261120removeui1" defer></script>
+    <script src="functions.js?v=20261120guide1" defer></script>
   <script src="procurement_ap_inbox.js?v=15" defer></script>
 </body>
 </html>

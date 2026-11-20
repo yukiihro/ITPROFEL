@@ -3,7 +3,7 @@ $current = basename($_SERVER['PHP_SELF']);
 $user = currentUser();
 $userRole = $user['role'] ?? '';
 $corePages = ['quotations.php', 'purchase_orders.php', 'orders.php', 'delivery.php', 'returns.php'];
-$billingPages = ['invoices.php', 'customer_account.php'];
+$billingPages = ['invoices.php', 'customer_account.php', 'payment_submissions.php'];
 $salesReport = ['reports.php'];
 $inventoryPages = ['inventory.php', 'inventory_stockout_approval.php', 'purchase_order_requests.php', 'inventory_delivery_approval.php'];
 $activeSection = '';
@@ -33,6 +33,7 @@ $isCustomer = $userRole === 'Customer';
                 <a class="section-nav <?= $current === 'inventory.php' ? 'active' : '' ?>" href="inventory.php"><span class="nav-icon">I</span><span>Inventory</span><span class="section-arrow">&rsaquo;</span></a>
                 <div class="nav-label">BILLING</div>
                 <a class="section-nav <?= $current === 'customer_account.php' ? 'active' : '' ?>" href="customer_account.php?section=payment"><span class="nav-icon">B</span><span>Payment</span><span class="section-arrow">&rsaquo;</span></a>
+                <a class="section-nav <?= $current === 'payment_submissions.php' ? 'active' : '' ?>" href="payment_submissions.php?status=Pending"><span class="nav-icon">V</span><span>Customer Payment Review</span><span class="section-arrow">&rsaquo;</span></a>
                 <div class="nav-label">REPORTS</div>
                 <a class="section-nav <?= $activeSection === 'sales' ? 'active' : '' ?>" href="reports.php?section=sales"><span class="nav-icon">S</span><span>Sales Report</span><span class="section-arrow">&rsaquo;</span></a>
             <?php elseif ($isSalesAdmin): ?>
@@ -41,6 +42,7 @@ $isCustomer = $userRole === 'Customer';
                 <a class="section-nav <?= $current === 'recent_activity.php' ? 'active' : '' ?>" href="recent_activity.php"><span class="nav-icon">A</span><span>Recent User Activity</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'admin_customers.php' ? 'active' : '' ?>" href="admin_customers.php"><span class="nav-icon">C</span><span>Customer Management</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'customer_account_approvals.php' ? 'active' : '' ?>" href="customer_account_approvals.php"><span class="nav-icon">V</span><span>Customer Account Verification</span><span class="section-arrow">&rsaquo;</span></a>
+                <a class="section-nav <?= $current === 'payment_submissions.php' ? 'active' : '' ?>" href="payment_submissions.php?status=Pending"><span class="nav-icon">P</span><span>Customer Payment Review</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'sales_quotation_approval.php' ? 'active' : '' ?>" href="sales_quotation_approval.php"><span class="nav-icon">Q</span><span>Sales Quotation Approval</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'purchase_order_requests.php' ? 'active' : '' ?>" href="purchase_order_requests.php"><span class="nav-icon">P</span><span>Purchase Order Requests</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'sales_order_approval.php' ? 'active' : '' ?>" href="sales_order_approval.php"><span class="nav-icon">O</span><span>Sales Order Approval</span><span class="section-arrow">&rsaquo;</span></a>

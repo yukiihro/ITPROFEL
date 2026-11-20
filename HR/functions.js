@@ -144,13 +144,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentPayrollCycle = () => {
         const date = new Date();
         const month = date.toLocaleDateString('en-US', { month: 'long' });
-        return `${month} 15–30, ${date.getFullYear()}`;
+        return `${month} 15-30, ${date.getFullYear()}`;
     };
 
     const SEED = {
         employees: [], attendance: [], leaves: [], payroll: [], deductions: [], contributions: [],
         accounts: [], receivables: [], payables: [], cashBank: [], expenses: [],
-        settings: { company: 'D.E.V.S Management Inc.', currency: 'PHP (₱)', cycle: 'October 1–15, 2026', days: '5 days (Mon–Fri)' }
+        settings: { company: 'D.E.V.S Management Inc.', currency: 'PHP (₱)', cycle: 'October 1-15, 2026', days: '5 days (Mon-Fri)' }
     };
 
     const STORE_KEY = IS_FINANCE ? 'devs_finance_store_v1' : 'devs_store_v1';
@@ -395,15 +395,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'Recorded deduction for this payroll period.';
     }
 
+    // Older imports turned multi-byte date separators (– / —) into "???".
+    // Normalise legacy period text to plain hyphens so displays and filters
+    // stay consistent, whether the value comes from the server or localStorage.
+    function normalizePeriodText(value) {
+        return String(value ?? '')
+            .replace(/\s*\?{2,}\s*/g, '-')
+            .replace(/\s*[–—]\s*/g, '-');
+    }
+    function normalizeStorePeriods() {
+        const fields = ['payroll_period', 'cycle', 'period'];
+        ['payroll', 'deductions', 'contributions'].forEach((key) => {
+            if (!Array.isArray(store[key])) return;
+            store[key].forEach((row) => {
+                if (!row || typeof row !== 'object') return;
+                fields.forEach((field) => {
+                    if (typeof row[field] === 'string') row[field] = normalizePeriodText(row[field]);
+                });
+            });
+        });
+        if (store.settings && typeof store.settings.cycle === 'string') {
+            store.settings.cycle = normalizePeriodText(store.settings.cycle);
+        }
+    }
+    normalizeStorePeriods();
+
     async function syncStateFromServer() {
         const result = await apiRequest('state');
         if (result.state && typeof result.state === 'object') {
             Object.assign(store, result.state);
+            normalizeStorePeriods();
             return;
         }
     }
 
     function saveStore(activity = '') {
+        normalizeStorePeriods();
         // Build a set of valid numeric employee_ids from the current store.
         const validEmpIds = new Set(
             store.employees
@@ -491,7 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Canonical positions for HR and Finance. Other departments keep their
     // own role sets (see positionOptionsFor).
     const HR_POSITIONS = ['HR Admin', 'HR Manager', 'HR Staff', 'Payroll Officer'];
-    const FINANCE_POSITIONS = ['Finance Admin', 'Finance Manager', 'Finance Staff', 'Cashier', 'Finance Employee'];
+    const FINANCE_POSITIONS = ['Finance Admin', 'Finance Manager', 'Finance Staff', 'Cashier'];
     const WAREHOUSE_POSITIONS = ['Warehouse Manager', 'Inventory Staff', 'Warehouse Staff', 'Inventory Controller', 'Picker and Packer', 'Shipping and Receiving Clerk'];
     // 'Admin'/'Staff' remain here for Sales and Production accounts.
     const ALL_POSITIONS = [...HR_POSITIONS, ...FINANCE_POSITIONS, 'Admin', 'Staff', 'Buyer', 'Manager', 'Supervisor', ...WAREHOUSE_POSITIONS];
@@ -2398,7 +2425,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'is-pending';
     }
 
-    /* Payroll periods are free-form text ("November 15–30, 2026"), so the
+    /* Payroll periods are free-form text ("November 15-30, 2026"), so the
        print date range is worked out by parsing that text into real dates. */
     const PERIOD_MONTHS = {
         january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2,
@@ -2431,7 +2458,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!raw) return null;
         // Normalise every range separator to "|". Plain hyphens are left alone
         // for ISO dates, but split "November 15-30, 2026" into two edges.
-        let joined = raw.replace(/\s*(?:–|—|\bto\b|\bthrough\b)\s*/gi, '|');
+        let joined = raw.replace(/\s*(?:\?{2,}|–|—|\bto\b|\bthrough\b)\s*/gi, '|');
         if (!/^\d{4}-\d{1,2}-\d{1,2}/.test(raw)) joined = joined.replace(/\s*-\s*(?=\d)/g, '|');
         const parts = joined.split('|').map(s => s.trim()).filter(Boolean);
         if (!parts.length) return null;

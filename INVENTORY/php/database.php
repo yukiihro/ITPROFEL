@@ -125,8 +125,8 @@ function ensure_base_catalog(PDO $pdo)
           ('Raw Materials','Active'),('Footwear','Active')
           ON DUPLICATE KEY UPDATE status='Active'");
         $warehouses = [
-            ['WH-MAIN', 'Main Warehouse', 'Main Storage', 'Andrew Suficiencia'],
-            ['WH-SECONDARY', 'Secondary Warehouse', 'Secondary Storage', 'Meynard Paje']
+            ['WH-MAIN', 'Main Warehouse', ' Brgy II C, San Pablo City', 'Andrew Suficiencia'],
+            ['WH-SECONDARY', 'Secondary Warehouse', 'Brgy Brgy Palina, Nagcarlan, Laguna', 'Meynard Paje']
         ];
         foreach ($warehouses as $w) {
             $findWh = $pdo->prepare("SELECT id FROM warehouses WHERE warehouse_name=? ORDER BY id LIMIT 1");

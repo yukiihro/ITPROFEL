@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentPayrollCycle = () => {
         const date = new Date();
         const month = date.toLocaleDateString('en-US', { month: 'long' });
-        return `${month} 15–30, ${date.getFullYear()}`;
+        return `${month} 15-30, ${date.getFullYear()}`;
     };
 
     const SEED = {
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         settings: {
             company: 'D.E.V.S Management Inc.',
             currency: 'PHP (₱)',
-            cycle: 'September 15–30, 2026',
+            cycle: 'September 15-30, 2026',
             days: '5 days (Mon–Fri)'
         }
     };
@@ -1370,10 +1370,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Date', escapeHtml(tx.date || '—')],
                 ['Source', escapeHtml(tx.source || '—')],
                 ['Description', escapeHtml(tx.description || '—')],
-                ['Account', escapeHtml(tx.accountCode || '—')],
+                ['Account', escapeHtml(transactionAccountText(tx))],
                 ['Status', finStatusText(tx.status)],
                 ['Amount', `<span class="fin-detail-amount">${peso(tx.amount)}</span>`]
             ], 'Amount', peso(tx.amount));
+    }
+
+    /* Every financial transaction is routed through the bank account in
+       Cash / Bank, so all of them show the same configured bank name. */
+    function financeBankAccountName() {
+        return (store.cashBank || []).find(
+            r => /bank/i.test(String(r.account || r.type || ''))
+        )?.account || 'DEVS Bank Account';
+    }
+    function cashBankChartCode(cb) {
+        return /cash/i.test(String(cb?.account || cb?.type || '')) ? '1000' : '1100';
+    }
+    function transactionAccountText(tx) {
+        return financeBankAccountName();
     }
 
     function openExpenseCategoryDetail(cat) {
@@ -1461,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = pmParseDate(value);
         if (!date) return '—';
         const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-        const half = date.getDate() <= 15 ? '1–15' : `16–${lastDay}`;
+        const half = date.getDate() <= 15 ? '1-15' : `16-${lastDay}`;
         return `${date.toLocaleDateString('en-US', { month: 'short' })} ${half}, ${date.getFullYear()}`;
     };
 
@@ -2860,15 +2874,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 description: r.description || '',
                 amount: r.amount,
                 status: (store.payments || []).find(p => Number(p.id) === Number(r.id))?.status || 'Completed',
-                accountCode: '',
+                // Sales collections are bank receipts, so show the bank account.
+                accountCode: '1100',
                 fromPayments: true
             }));
         const allRows = [...ledgerRows, ...collectionRows];
 
         const isMoneyInRow = (r) => String(r.source || '').toLowerCase() === 'sales';
         const rows = allRows.filter(r => {
-            const accountLabel = (store.accounts || []).find(a => a.code === r.accountCode)?.name || r.accountCode || '';
-            const matchQ = !q || `${r.id} ${r.reference} ${r.description} ${r.source} ${accountLabel}`.toLowerCase().includes(q);
+            const accountText = transactionAccountText(r);
+            const matchQ = !q || `${r.id} ${r.reference} ${r.description} ${r.source} ${accountText}`.toLowerCase().includes(q);
             // Older rows were saved as "Procure" / "Supplier Pay" before the
             // rename, so both spellings must match the filters.
             const matchS = !source || r.source === source
@@ -2896,7 +2911,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tbody.innerHTML = pageRows.map(r => {
             const isMoneyIn = String(r.source || '').toLowerCase() === 'sales';
-            const accountLabel = (store.accounts || []).find(a => a.code === r.accountCode);
+            const accountText = transactionAccountText(r);
             // Collection rows come from payment_transactions, not the editable
             // ledger, so they render without a View action.
             const actionCell = r.fromPayments
@@ -2912,7 +2927,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${escapeHtml(r.reference)}</td>
                     <td>${escapeHtml(r.source)}</td>
                     <td>${isMoneyIn ? 'Money In' : 'Money Out'}</td>
-                    <td>${accountLabel ? `${escapeHtml(r.accountCode)} · ${escapeHtml(accountLabel.name)}` : '—'}</td>
+                    <td>${escapeHtml(accountText)}</td>
                     <td>${escapeHtml(r.description)}</td>
                     <td class="exd-amount">${peso(r.amount)}</td>
                     <td><span class="exd-status exd-status-${statusKey(r.status)}">${escapeHtml(r.status)}</span></td>
@@ -3327,8 +3342,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span style="color:#666;">${label}</span>
                 <strong style="color:#222;font-weight:500;text-align:right;">${value}</strong>
             </div>`;
-        const account = (store.accounts || []).find(a => a.code === tx.accountCode);
-        const accountText = account ? `${account.code} · ${account.name}` : (tx.accountCode || '—');
+        const accountText = transactionAccountText(tx);
         const payable = (store.payables || []).find(p => String(p.id) === String(tx.payableId));
         openModal({
             title: 'Transaction Receipt',
@@ -3424,8 +3438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function viewTransaction(tx) {
-        const account = (store.accounts || []).find(a => a.code === tx.accountCode);
-        const accText = account ? `${tx.accountCode} · ${account.name}` : (tx.accountCode || '—');
+        const accText = transactionAccountText(tx);
         const row = (label, value) => `<div class="view-modal-row"><span>${label}</span> <strong>${value}</strong></div>`;
 
         openModal({
@@ -3492,11 +3505,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const sources = ['Procurement', 'Production'];
         const types   = ['Accounts Payable'];
         const statuses = ['Completed', 'Approved', 'Pending', 'Failed'];
-        // Default the Chart of Account to a real money account (Bank, then Cash)
-        // so a payment can never silently fall back to "Bank" with no account.
-        const defaultTxAccount = (store.accounts || []).find(a => a.code === '1100')?.code
-            || (store.accounts || []).find(a => a.code === '1000')?.code
-            || (store.accounts || [])[0]?.code || '';
+        // Transactions are paid from a Cash / Bank account, not a Chart of
+        // Account. Bank is the default; Cash is the alternative.
+        const cashBankChoices = (store.cashBank || []).map(cb => ({
+            code: cashBankChartCode(cb),
+            label: cb.accountNumber ? `${cb.account} · ${cb.accountNumber}` : cb.account
+        })).filter(c => c.label);
+        const defaultTxAccount = cashBankChoices.find(c => c.code === '1100')?.code
+            || cashBankChoices.find(c => c.code === '1000')?.code
+            || (store.accounts || []).find(a => a.code === '1100')?.code
+            || (store.accounts || []).find(a => a.code === '1000')?.code || '';
         // Unpaid AP invoices the Finance user can pay with this transaction.
         // Rows already Paid (matched by payableStatus) are excluded, so an AP
         // entry cannot be paid twice through this form.
@@ -3608,12 +3626,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <small id="tx-ap-hint" style="display:block;margin-top:4px;">Select an unpaid payable to auto-fill its reference and amount due.</small>
                             </div>
                             <div class="split-field">
-                                <label for="tx-account">Chart of Account</label>
+                                <label for="tx-account">Cash / Bank Account</label>
                                 <select id="tx-account" name="accountCode">
                                     <option value="">— None —</option>
-                                    ${(store.accounts || []).map(a => `<option value="${escapeHtml(a.code)}" ${a.code === defaultTxAccount ? 'selected' : ''}>${escapeHtml(a.code)} · ${escapeHtml(a.name)}</option>`).join('')}
+                                    ${cashBankChoices.length
+                                        ? cashBankChoices.map(c => `<option value="${escapeHtml(c.code)}" ${c.code === defaultTxAccount ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')
+                                        : (store.accounts || []).filter(a => a.code === '1000' || a.code === '1100').map(a => `<option value="${escapeHtml(a.code)}" ${a.code === defaultTxAccount ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('')}
                                 </select>
-                                <span class="error-text">Select the account the payment is made from.</span>
+                                <span class="error-text">Select the cash or bank account the payment is made from.</span>
                             </div>
                             <div class="split-field">
                                 <label for="tx-amount">Amount</label>
@@ -6335,6 +6355,38 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    /* Recent Transaction lists the actual money movements — financial
+       transactions plus Sales collections that only exist as payments — all
+       booked to the bank account. The cash_bank rows are accounts, not
+       movements, so they no longer fill this table. */
+    function recentTransactionRows() {
+        const bank = financeBankAccountName();
+        const isIn = (r) => String(r.source || '').toLowerCase() === 'sales';
+        const fromLedger = (store.transactions || []).map(t => ({
+            date: t.date,
+            id: t.reference || t.id,
+            description: t.description,
+            type: isIn(t) ? 'Credit' : 'Debit',
+            amount: t.amount,
+            account: bank
+        }));
+        const ledgerKeys = new Set((store.transactions || []).map(t =>
+            `${String(t.reference || '').trim().toLowerCase()}|${Number(t.amount || 0).toFixed(2)}`));
+        const fromPayments = (Array.isArray(store.cashFlow?.in) ? store.cashFlow.in : [])
+            .filter(r => !ledgerKeys.has(
+                `${String(r.reference || '').trim().toLowerCase()}|${Number(r.amount || 0).toFixed(2)}`))
+            .map(r => ({
+                date: r.date,
+                id: r.reference,
+                description: r.description,
+                type: 'Credit',
+                amount: r.amount,
+                account: bank
+            }));
+        return [...fromLedger, ...fromPayments].sort((a, b) =>
+            String(b.date || '').localeCompare(String(a.date || '')));
+    }
+
     function renderCashBankRows() {
         const tbody = $('#cbTbody');
         if (!tbody) return;
@@ -6393,7 +6445,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render Recent Transactions table
         const recentBody = $('#cbRecentTbody');
         const recentQuery = ($('#cbRecentSearch')?.value || '').trim().toLowerCase();
-        const recentAll = (store.cashBank || [])
+        const recentAll = recentTransactionRows()
             .filter(r => !recentQuery || `${r.date} ${r.id} ${r.description} ${r.type} ${r.account}`.toLowerCase().includes(recentQuery));
         const recent = finSlice('cbRecent', recentAll, FIN_RECENT_ROWS_PER_PAGE);
 

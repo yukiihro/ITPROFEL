@@ -188,7 +188,7 @@ unset($_SESSION['redirect_guard']);
 
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
-    <script src="functions.js?v=20261121pos1" defer></script>
+    <script src="functions.js?v=20261121recenttx1" defer></script>
   <script src="procurement_ap_inbox.js?v=15" defer></script>
 </body>
 </html>

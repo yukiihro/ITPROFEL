@@ -180,6 +180,21 @@ function audit(int $userId, string $email, string $role, string $action,
     } catch (Throwable $e) { error_log('audit: ' . $e->getMessage()); }
 }
 
+/* The account that receives money in. Sales collections are bank receipts,
+   so they always land on the configured bank account in Cash / Bank, never
+   on the cash account — even when the customer paid in cash or GCash. */
+function financeBankAccountId(PDO $pdo): int
+{
+    return (int)($pdo->query(
+        "SELECT account_id FROM cash_bank
+          WHERE LOWER(TRIM(COALESCE(account_type, ''))) = 'bank'
+             OR LOWER(TRIM(COALESCE(account_name, ''))) LIKE '%bank%'
+          ORDER BY CASE WHEN LOWER(TRIM(COALESCE(account_type, ''))) = 'bank'
+                        THEN 0 ELSE 1 END, account_id
+          LIMIT 1"
+    )->fetchColumn() ?: 0);
+}
+
 /* The money accounts (cash_bank) plus the movements they should show.
    Both the Cash / Bank page and the Chart of Accounts read these figures, so
    the two screens can never disagree: an account balance is its recorded
@@ -196,9 +211,12 @@ function financeCashMovements(PDO $pdo): array
 
     // Money in: Sales collections recorded against a receivable, plus Sales
     // ledger transactions (collections already recorded there are skipped).
+    // Every money-in movement is a bank receipt, so it increases the bank
+    // account balance in Cash / Bank regardless of the customer's method.
     $in = [];
+    $bankAccountId = financeBankAccountId($pdo);
     $collections = $pdo->query(
-        "SELECT pt.amount, COALESCE(pt.payment_type, '') AS method
+        "SELECT pt.amount
            FROM payment_transactions pt
           WHERE LOWER(TRIM(COALESCE(pt.status, ''))) IN ('completed', 'paid', 'approved')
             AND EXISTS (SELECT 1 FROM accounts_receivable ar WHERE ar.payment_id = pt.transaction_id)
@@ -211,9 +229,9 @@ function financeCashMovements(PDO $pdo): array
     foreach ($collections as $c) {
         $in[] = [
             'amount'       => (float)$c['amount'],
-            'is_cash'      => strtolower(trim((string)$c['method'])) === 'cash',
-            'account_id'   => 0,
-            'account_type' => '',
+            'is_cash'      => false,
+            'account_id'   => $bankAccountId,
+            'account_type' => 'bank',
         ];
     }
 
@@ -238,8 +256,15 @@ function financeCashMovements(PDO $pdo): array
             'account_id'   => $postedId,
             'account_type' => $postedType,
         ];
-        if (strtolower(trim((string)$t['transaction_type'])) === 'sales') $in[] = $entry;
-        else $out[] = $entry;
+        if (strtolower(trim((string)$t['transaction_type'])) === 'sales') {
+            // Money in is always a bank receipt in Cash / Bank.
+            $entry['is_cash'] = false;
+            $entry['account_id'] = $bankAccountId;
+            $entry['account_type'] = 'bank';
+            $in[] = $entry;
+        } else {
+            $out[] = $entry;
+        }
     }
 
     return ['in' => $in, 'out' => $out];
@@ -490,7 +515,10 @@ function loadState(): array
                 "SELECT ft.transaction_id AS id, ft.transaction_date AS date,
                         COALESCE(ft.reference_no, '') AS reference,
                         'Sales' AS source,
-                        COALESCE(ft.description, '') AS description,
+                        CASE WHEN LOWER(TRIM(COALESCE(ft.description, ''))) LIKE '%received by bank%'
+                             THEN ft.description
+                             ELSE CONCAT(COALESCE(ft.description, ''), ' · Received by Bank')
+                        END AS description,
                         ft.amount
                    FROM financial_transactions ft
                   WHERE LOWER(TRIM(COALESCE(ft.transaction_type, ''))) = 'sales'
@@ -498,7 +526,10 @@ function loadState(): array
                  SELECT pt.transaction_id AS id, pt.transaction_date AS date,
                         COALESCE(pt.reference_no, '') AS reference,
                         'Sales' AS source,
-                        COALESCE(pt.description, '') AS description,
+                        CASE WHEN LOWER(TRIM(COALESCE(pt.description, ''))) LIKE '%received by bank%'
+                             THEN pt.description
+                             ELSE CONCAT(COALESCE(pt.description, ''), ' · Received by Bank')
+                        END AS description,
                         pt.amount
                    FROM payment_transactions pt
                   WHERE LOWER(TRIM(COALESCE(pt.status, ''))) IN ('completed', 'paid', 'approved')
@@ -527,7 +558,7 @@ function loadState(): array
         'settings' => [
             'company' => 'D.E.V.S Management Inc.',
             'currency' => 'PHP (₱)',
-            'cycle' => 'September 15–30, 2026',
+            'cycle' => 'September 15-30, 2026',
             'days' => '5 days (Mon–Fri)',
         ],
     ];
@@ -848,20 +879,28 @@ if ($action === 'sales_collection' && $method === 'POST') {
     $finance->beginTransaction();
     try {
         $ar = $finance->prepare(
-            'SELECT ar_id, invoice_no, amount, sales_id
-             FROM accounts_receivable WHERE sales_id = ? LIMIT 1'
+            "SELECT ar.ar_id, ar.invoice_no, ar.amount, ar.sales_id,
+                    COALESCE(c.customer_name, '') AS customer
+             FROM accounts_receivable ar
+             LEFT JOIN customers c ON c.customer_id = ar.customer_id
+             WHERE ar.sales_id = ? LIMIT 1"
         );
         $ar->execute([$salesInvoiceId]);
         $receivable = $ar->fetch();
         if (!$receivable) {
             throw new RuntimeException('The Sales invoice is not synchronized to Finance yet.');
         }
-        $cashAccount = (int)$finance->query(
-            'SELECT account_id FROM cash_bank ORDER BY account_id LIMIT 1'
-        )->fetchColumn();
-        if ($cashAccount <= 0) {
-            throw new RuntimeException('Finance has no cash or bank account configured.');
+        // Money in is a bank receipt: post it to the bank account in Cash / Bank.
+        $bankAccount = financeBankAccountId($finance);
+        if ($bankAccount <= 0) {
+            throw new RuntimeException('Finance has no bank account configured in Cash / Bank.');
         }
+
+        $description = 'Sales collection for ' . $receivable['invoice_no'];
+        if (trim((string)$receivable['customer']) !== '') {
+            $description .= ' / ' . trim((string)$receivable['customer']);
+        }
+        $description .= ' · Received by Bank';
 
         $existingPayment = $finance->prepare(
             'SELECT transaction_id FROM payment_transactions WHERE reference_no = ? LIMIT 1'
@@ -875,14 +914,21 @@ if ($action === 'sales_collection' && $method === 'POST') {
                  VALUES (?, ?, ?, ?, ?, "Completed", ?)'
             );
             $payment->execute([
-                $cashAccount,
+                $bankAccount,
                 $methodName,
                 $amount,
                 $date,
                 $collectionNo,
-                'Finance collection for ' . $receivable['invoice_no'],
+                $description,
             ]);
             $paymentId = (int)$finance->lastInsertId();
+        } else {
+            // Re-recording a collection must also correct its account and label.
+            $finance->prepare(
+                'UPDATE payment_transactions
+                    SET account_id = ?, description = ?
+                  WHERE transaction_id = ?'
+            )->execute([$bankAccount, $description, $paymentId]);
         }
         // Push the collection to Sales (this recomputes the Sales invoice's
         // amount_paid and status from the authoritative Sales data), then read

@@ -418,7 +418,7 @@ function loadState(): array
     $settings = [
         'company'  => 'D.E.V.S Management Inc.',
         'currency' => 'PHP (₱)',
-        'cycle'    => 'September 15–30, 2026',
+        'cycle'    => 'September 15-30, 2026',
         'days'     => '5 days (Mon–Fri)',
     ];
 
@@ -523,7 +523,7 @@ if ($action === 'register' && $method === 'POST') {
 if (!in_array($department, ['HR', 'Finance', 'Procurement', 'Inventory', 'Sales', 'Production'], true)) {
     respond(['ok' => false, 'message' => 'Please select a valid department.'], 422);
 }
-    if (!in_array($position, ['HR Admin', 'HR Manager', 'HR Staff', 'Payroll Officer', 'Finance Admin', 'Finance Manager', 'Finance Staff', 'Cashier', 'Finance Employee', 'Admin', 'Staff', 'Buyer', 'Manager', 'Supervisor', 'Warehouse Manager', 'Inventory Staff', 'Warehouse Staff', 'Inventory Controller', 'Picker and Packer', 'Shipping and Receiving Clerk'], true)) {
+    if (!in_array($position, ['HR Admin', 'HR Manager', 'HR Staff', 'Payroll Officer', 'Finance Admin', 'Finance Manager', 'Finance Staff', 'Cashier', 'Admin', 'Staff', 'Buyer', 'Manager', 'Supervisor', 'Warehouse Manager', 'Inventory Staff', 'Warehouse Staff', 'Inventory Controller', 'Picker and Packer', 'Shipping and Receiving Clerk'], true)) {
         respond(['ok' => false, 'message' => 'Please select a valid position.'], 422);
     }
     if ($password !== $confirm) {
@@ -1275,8 +1275,8 @@ if ($action === 'users.create' && $method === 'POST') {
             respond(['ok' => false, 'message' => 'HR accounts must use HR Admin, HR Manager, HR Staff, or Payroll Officer.'], 422);
         }
     } elseif ($department === 'Finance') {
-        if (!in_array($position, ['Finance Admin', 'Finance Manager', 'Finance Staff', 'Cashier', 'Finance Employee'], true)) {
-            respond(['ok' => false, 'message' => 'Finance accounts must use Finance Admin, Finance Manager, Finance Staff, Cashier, or Finance Employee.'], 422);
+        if (!in_array($position, ['Finance Admin', 'Finance Manager', 'Finance Staff', 'Cashier'], true)) {
+            respond(['ok' => false, 'message' => 'Finance accounts must use Finance Admin, Finance Manager, Finance Staff, or Cashier.'], 422);
         }
     } elseif ($department === 'Procurement') {
         if (!in_array($position, ['Buyer', 'Manager'], true)) {

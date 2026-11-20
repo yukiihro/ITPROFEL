@@ -72,11 +72,16 @@ function reconcileProductionToFinance(): int
     $recorded = [];            // costing_id => [transaction_id, status]
     $finance->beginTransaction();
     try {
+        // Lock the matching row (or the gap where it would go) so two Finance
+        // tabs refreshing at once cannot both insert the same costing. Matching
+        // on the order reference also repairs rows that lost their costing link
+        // in an older full-save, instead of adding a second copy.
         $find = $finance->prepare(
             'SELECT transaction_id FROM financial_transactions
              WHERE costing_id = ?
-                OR (costing_id IS NULL AND transaction_type = "Production" AND reference_no = ?)
-             ORDER BY transaction_id LIMIT 1'
+                OR (transaction_type = "Production" AND reference_no = ?)
+             ORDER BY transaction_id LIMIT 1
+             FOR UPDATE'
         );
         $update = $finance->prepare(
             'UPDATE financial_transactions
@@ -101,7 +106,7 @@ function reconcileProductionToFinance(): int
             $supIns->execute([$supplierName]);
             $supplierId = (int)$finance->lastInsertId();
         }
-        $apFind = $finance->prepare('SELECT ap_id FROM accounts_payable WHERE invoice_no = ? LIMIT 1');
+        $apFind = $finance->prepare('SELECT ap_id FROM accounts_payable WHERE invoice_no = ? LIMIT 1 FOR UPDATE');
         $apIns = $finance->prepare(
             'INSERT INTO accounts_payable
              (supplier_id, invoice_no, amount, cost_of_goods, due_date, status)

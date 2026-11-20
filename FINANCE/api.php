@@ -1117,7 +1117,18 @@ if ($action === 'state' && $method === 'POST') {
             );
             $acctLookUp = $pdo->prepare('SELECT account_id FROM charts_of_accounts WHERE account_code = ? LIMIT 1');
             $accountCache = [];
+            $seenProductionRefs = [];
             foreach ($state['transactions'] as $t) {
+                // A Production order must have exactly one cost transaction.
+                // Older client states can carry several copies of the same
+                // order; skipping the repeats here stops a full save from
+                // recreating the duplicates the reconciliation repaired.
+                $isProduction = strcasecmp(trim((string)($t['source'] ?? '')), 'Production') === 0;
+                $txRef = trim((string)($t['reference'] ?? ''));
+                if ($isProduction && $txRef !== '') {
+                    if (isset($seenProductionRefs[$txRef])) continue;
+                    $seenProductionRefs[$txRef] = true;
+                }
                 $accountCode = trim((string)($t['accountCode'] ?? ''));
                 $accountId = null;
                 if ($accountCode !== '') {

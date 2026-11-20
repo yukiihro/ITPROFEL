@@ -416,9 +416,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const HR_ADMIN_POSITIONS = ['HR Admin', 'HR Manager', 'Payroll Admin'];
     const isHrAdmin = () => ['Administrator', 'HR Manager', 'HR Admin'].includes(activeUser?.role)
-        || String(activeUser?.position || '').toLowerCase() === 'admin'
-            && String(activeUser?.department || '').toLowerCase() === 'hr';
+        || (String(activeUser?.department || '').toLowerCase() === 'hr'
+            && (HR_ADMIN_POSITIONS.includes(activeUser?.position)
+                || String(activeUser?.position || '').toLowerCase() === 'admin'));
 
     function runExportProgress({ filename, format, onDownload }) {
         const overlay = document.createElement('div');

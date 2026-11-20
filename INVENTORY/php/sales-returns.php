@@ -39,17 +39,55 @@ if ($action === "receive") {
             $warehouseId = (int)($decision["warehouse_id"] ?? 0);
             $inspection = trim((string)($decision["inspection_remarks"] ?? ""));
             if ($accepted === false || $rejected === false || $accepted < 0 || $rejected < 0 || $accepted + $rejected !== (int)$line["quantity"]) throw new Exception("Accepted and rejected quantities must add up to the returned quantity for " . $line["item_name"] . ".");
-            if ($accepted > 0) {
-                $wh = $pdo->prepare("SELECT id FROM warehouses WHERE id=? AND status='Active'");
-                $wh->execute([$warehouseId]);
-                if (!$wh->fetch()) throw new Exception("Choose an active warehouse for accepted items.");
-                $up = $pdo->prepare("INSERT INTO inventory(item_id,warehouse_id,quantity) VALUES(?,?,?) ON DUPLICATE KEY UPDATE quantity=quantity+VALUES(quantity)");
-                $up->execute([$line["item_id"],$warehouseId,$accepted]);
-                $ref = $header["return_number"];
-                $remarks = "Sales Return accepted. " . $line["damage_description"] . ($inspection !== "" ? " | Inspection: " . $inspection : "");
-                $mv = $pdo->prepare("INSERT INTO stock_movements(item_id,warehouse_id,movement_type,quantity,unit,reference_number,remarks,date,user_id) SELECT ?,?, 'SALES RETURN', ?, unit, ?, ?, ?, ? FROM items WHERE id=?");
-                $mv->execute([$line["item_id"],$warehouseId,$accepted,$ref,$remarks,date('Y-m-d'),$_SESSION["user_id"],$line["item_id"]]);
-            }
+if ($accepted > 0) {
+    $wh = $pdo->prepare("SELECT id FROM warehouses WHERE id=? AND status='Active'");
+    $wh->execute([$warehouseId]);
+    if (!$wh->fetch()) throw new Exception("Choose an active warehouse for accepted items.");
+
+    $stock = $pdo->prepare("SELECT quantity FROM inventory WHERE item_id=? AND warehouse_id=? FOR UPDATE");
+    $stock->execute([$line["item_id"], $warehouseId]);
+    $stockRow = $stock->fetch();
+
+    $currentQuantity = $stockRow ? (int)$stockRow["quantity"] : 0;
+    $adjustedQuantity = $currentQuantity + $accepted;
+
+    $up = $pdo->prepare("INSERT INTO inventory(item_id,warehouse_id,quantity) VALUES(?,?,?) ON DUPLICATE KEY UPDATE quantity=quantity+VALUES(quantity)");
+    $up->execute([$line["item_id"], $warehouseId, $accepted]);
+
+    $ref = $header["return_number"];
+    $remarks = "Sales Return accepted. " . $line["damage_description"] . ($inspection !== "" ? " | Inspection: " . $inspection : "");
+
+    $adjustmentNumber = "SR-" . $id . "-" . $line["id"];
+    $adjustmentRemarks = "Accepted returned items from " . $ref . ". " . $remarks;
+
+    $adjustment = $pdo->prepare("INSERT INTO stock_adjustments(adjustment_number,item_id,warehouse_id,current_quantity,adjusted_quantity,difference,reason,remarks,date,user_id) VALUES(?,?,?,?,?,?,?,?,?,?)");
+
+    $adjustment->execute([
+        $adjustmentNumber,
+        $line["item_id"],
+        $warehouseId,
+        $currentQuantity,
+        $adjustedQuantity,
+        $accepted,
+        "Sales Return",
+        $adjustmentRemarks,
+        date("Y-m-d"),
+        $_SESSION["user_id"]
+    ]);
+
+    $mv = $pdo->prepare("INSERT INTO stock_movements(item_id,warehouse_id,movement_type,quantity,unit,reference_number,remarks,date,user_id) SELECT ?,?, 'SALES RETURN', ?, unit, ?, ?, ?, ? FROM items WHERE id=?");
+
+    $mv->execute([
+        $line["item_id"],
+        $warehouseId,
+        $accepted,
+        $ref,
+        $remarks,
+        date('Y-m-d'),
+        $_SESSION["user_id"],
+        $line["item_id"]
+    ]);
+}
             $totalAccepted += $accepted; $totalRejected += $rejected;
             $upLine = $pdo->prepare("UPDATE sales_return_items SET accepted_quantity=?,rejected_quantity=?,warehouse_id=?,inspection_remarks=?,inspected_at=NOW() WHERE id=?");
             $upLine->execute([$accepted,$rejected,$accepted > 0 ? $warehouseId : null,$inspection,$line["id"]]);

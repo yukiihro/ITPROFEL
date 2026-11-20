@@ -39,7 +39,8 @@ function isHrAdmin(array $u): bool
     $dept = strtolower($u['department'] ?? '');
     $pos  = strtolower($u['position'] ?? '');
     return $role === 'administrator'
-        || ($dept === 'hr' && ($role === 'hr admin' || $role === 'hr manager' || $pos === 'admin'));
+        || ($dept === 'hr' && ($role === 'hr admin' || $role === 'hr manager'
+            || in_array($pos, ['admin', 'hr admin', 'hr manager', 'payroll admin'], true)));
 }
 
 function isFinanceAdmin(array $u): bool

@@ -488,9 +488,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // HR department positions. Admin was renamed to HR Admin; Staff was
+    // removed. HR Manager and Payroll Admin are the two new HR positions.
+    // Other departments keep their own role sets (see positionOptionsFor).
+    const HR_POSITIONS = ['HR Admin', 'HR Manager', 'Payroll Admin'];
+    const WAREHOUSE_POSITIONS = ['Warehouse Manager', 'Inventory Staff', 'Warehouse Staff', 'Inventory Controller', 'Picker and Packer', 'Shipping and Receiving Clerk'];
+    const ALL_POSITIONS = [...HR_POSITIONS, 'Staff', 'Buyer', 'Manager', 'Supervisor', ...WAREHOUSE_POSITIONS];
+    const positionOptionsFor = (dept) =>
+        dept === 'HR' ? HR_POSITIONS
+        : dept === 'Inventory' ? WAREHOUSE_POSITIONS
+        : dept === 'Procurement' ? ['Buyer', 'Manager']
+        : dept === 'Production' ? ['Staff', 'Supervisor']
+        : ['Staff', 'Admin'];
+
     const isHrAdmin = () => ['Administrator', 'HR Manager', 'HR Admin'].includes(activeUser?.role)
         || (String(activeUser?.department || '').toLowerCase() === 'hr'
-            && /admin/i.test(String(activeUser?.position || '')));
+            && (/admin/i.test(String(activeUser?.position || '')) || HR_POSITIONS.includes(activeUser?.position)));
     const canManageRecords = () => isHrAdmin();
 
     let pageAccessCache = null;
@@ -2884,10 +2897,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </select>
                         <select id="amRole" class="coa-filter-select">
                             <option value="">All Positions</option>
-                            <option>Admin</option>
-                            <option>Staff</option>
-                            <option>Buyer</option>
-                            <option>Manager</option>
+                            ${ALL_POSITIONS.map(p => `<option>${escapeHtml(p)}</option>`).join('')}
                         </select>
                         <select id="amStatus" class="coa-filter-select">
                             <option value="">All Status</option>
@@ -4293,7 +4303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <select id="paUser"><option value="__all__">— All users in this group —</option></select>
                 </div>
                 <div class="pa-filter"><span>Select Position:</span>
-                    <select id="paPosition"><option value="">All Positions</option><option>Admin</option><option>Staff</option></select>
+                    <select id="paPosition"><option value="">All Positions</option>${ALL_POSITIONS.map(p => `<option>${escapeHtml(p)}</option>`).join('')}</select>
                 </div>
                 <div class="pa-filter"><span>Select Department:</span>
                     <select id="paDepartment"><option value="">All Departments</option><option>HR</option><option>Finance</option><option>Production</option></select>
@@ -4332,16 +4342,14 @@ document.addEventListener('DOMContentLoaded', () => {
         select.classList.remove('ss-native-hidden');
         upgradeSelectsIn(select);
     }
-    // The Position filter follows the department: Production accounts use
-    // Staff/Supervisor, everything else Staff/Admin. All Departments keeps
-    // every option so cross-department filtering still works.
+    // The Position filter follows the department: HR accounts use the three
+    // HR positions, other departments keep their own roles. All Departments
+    // keeps every option so cross-department filtering still works.
     function syncPaPositionOptions() {
         const deptSel = document.getElementById('paDepartment');
         const posSel = document.getElementById('paPosition');
         if (!deptSel || !posSel) return;
-        const roles = deptSel.value === 'Production'
-            ? ['Staff', 'Supervisor']
-            : ['Admin', 'Staff'];
+        const roles = deptSel.value ? positionOptionsFor(deptSel.value) : ALL_POSITIONS;
         const current = posSel.value;
         const changed = [...posSel.options].some((o, i) => (i === 0 ? o.value !== '' : o.value !== roles[i - 1]))
             || posSel.options.length !== roles.length + 1;
@@ -5099,8 +5107,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function openEmployeeForm(emp = null) {
         const isEdit = !!emp;
-        const e = emp || { name: '', position: 'Staff', dept: 'HR', gender: 'Female', email: '', phone: '', salary: '', status: 'Active', joined: todayDateString() };
+        const e = emp || { name: '', position: HR_POSITIONS[0], dept: 'HR', gender: 'Female', email: '', phone: '', salary: '', status: 'Active', joined: todayDateString() };
         const depts = ['HR', 'Finance', 'Procurement', 'Inventory', 'Sales', 'Production'];
+        // Keep a legacy position (e.g. Staff) selectable while editing an
+        // existing record; new records use the department's current options.
+        const employeePositionOptions = () => {
+            const opts = positionOptionsFor(e.dept).slice();
+            if (isEdit && e.position && !opts.includes(e.position)) opts.unshift(e.position);
+            return opts;
+        };
         openModal({
             title: isEdit ? `Edit Employee | ${emp.id}` : 'Add Employee',
             size: 'lg',
@@ -5199,7 +5214,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="split-field"><label for="f-email">Email <b class="req">*</b></label><input type="email" id="f-email" name="email" value="${escapeHtml(e.email)}" required /><span class="error-text">Please enter a valid email.</span></div>
                         <div class="split-field"><label for="f-phone">Contact Number</label><input type="text" id="f-phone" name="phone" value="${escapeHtml(e.phone)}" placeholder="63+" /></div>
                         <div class="split-field"><label for="f-gender">Gender</label><select id="f-gender" name="gender"><option ${e.gender === 'Female' ? 'selected' : ''}>Female</option><option ${e.gender === 'Male' ? 'selected' : ''}>Male</option></select></div>
-                        <div class="split-field"><label for="f-position">Account Type</label><select id="f-position" name="position" required><option ${e.position === 'Admin' ? 'selected' : ''}>Admin</option><option ${e.position !== 'Admin' ? 'selected' : ''}>Staff</option></select></div>
+                        <div class="split-field"><label for="f-position">Account Type</label><select id="f-position" name="position" required>${employeePositionOptions().map(p => `<option ${e.position === p ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}</select></div>
                         <div class="split-field"><label for="f-dept">Departments</label><select id="f-dept" name="dept" required>${depts.map(d => `<option ${d === e.dept ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
                     </div>
                             </section>
@@ -5232,18 +5247,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const modalEl = document.getElementById('modal');
         if (modalEl) modalEl.classList.add('modal-split', 'voucher-modal');
+        // Department drives the position options here, as in Add Account.
+        const empDeptSel = document.getElementById('f-dept');
+        const empPosSel = document.getElementById('f-position');
+        empDeptSel?.addEventListener('change', () => {
+            if (!empPosSel) return;
+            const opts = positionOptionsFor(empDeptSel.value || 'HR');
+            const current = empPosSel.value;
+            empPosSel.innerHTML = opts.map(p => `<option ${p === current ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+            refreshUpgradedSelect(empPosSel);
+        });
     }
     function openCreateAccountForm(prefill = {}) {
         const depts = ['HR', 'Finance', 'Procurement', 'Inventory', 'Sales', 'Production'];
         const today = todayDateString();
         const val = (name, fallback = '') => escapeHtml(String(prefill[name] ?? fallback));
-        // Procurement accounts are Buyer/Manager; Inventory uses its real
-        // warehouse roles; every other department uses Staff/Admin.
-        const positionOptions = (dept) =>
-            dept === 'Inventory' ? ['Warehouse Manager', 'Inventory Staff', 'Warehouse Staff', 'Inventory Controller', 'Picker and Packer', 'Shipping and Receiving Clerk']
-            : dept === 'Procurement' ? ['Buyer', 'Manager']
-            : dept === 'Production' ? ['Staff', 'Supervisor']
-            : ['Staff', 'Admin'];
+        // HR uses HR Admin / HR Manager / Payroll Admin; other departments
+        // keep their own role sets (shared helper near the top of this file).
+        const positionOptions = positionOptionsFor;
         const initialPos = positionOptions(prefill.department || 'HR');
 
         openModal({
@@ -5348,9 +5369,9 @@ document.addEventListener('DOMContentLoaded', () => {
             `
         });
 
-        // Department drives the Position options: Procurement → Buyer/Manager,
-        // everything else → Staff/Admin. Rebuild the searchable dropdown when
-        // the department changes.
+        // Department drives the Position options: HR → HR Admin/HR Manager/
+        // Payroll Admin; other departments keep their own roles. Rebuild the
+        // searchable dropdown when the department changes.
         const deptSel = modalBody.querySelector('[name="department"]');
         const posSel = modalBody.querySelector('[name="position"]');
         const refreshPositionOptions = () => {

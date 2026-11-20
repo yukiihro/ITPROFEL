@@ -225,6 +225,6 @@ if (strcasecmp($dept, 'HR') !== 0) {
 
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
-        <script src="functions.js?v=20261120guide1" defer></script>
+        <script src="functions.js?v=20261120hrpos1" defer></script>
 </body>
 </html>

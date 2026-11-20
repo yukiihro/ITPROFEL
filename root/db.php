@@ -34,12 +34,14 @@ function ensureAdminAccounts(PDO $pdo): void
             'password' => getenv('HR_ADMIN_PASSWORD') ?: 'Admin123456789!',
             'name' => 'HR Administrator',
             'department' => 2,
+            'position' => 'HR Admin',
         ],
         [
             'username' => 'financeadmin@gmail.com',
             'password' => getenv('FINANCE_ADMIN_PASSWORD') ?: 'Admin123456789!',
             'name' => 'Finance Administrator',
             'department' => 1,
+            'position' => 'Admin',
         ],
     ];
 
@@ -52,16 +54,18 @@ function ensureAdminAccounts(PDO $pdo): void
         );
         $createEmployee = $pdo->prepare(
             'INSERT INTO employees (name, position, department, employment_status, basic_salary, date_hired)
-             VALUES (?, "Admin", ?, "Active", 0, CURDATE())'
+             VALUES (?, ?, ?, "Active", 0, CURDATE())'
         );
+        // Do not overwrite an existing admin's position here — HR manages it
+        // (HR admins use "HR Admin", Finance admins keep "Admin").
         $updateEmployee = $pdo->prepare(
             'UPDATE employees
-             SET name = ?, position = "Admin", department = ?, employment_status = "Active"
+             SET name = ?, department = ?, employment_status = "Active"
              WHERE employee_id = ?'
         );
         $createAccount = $pdo->prepare(
             'INSERT INTO accounts (employee_id, username, password, position, status)
-             VALUES (?, ?, ?, "Admin", "Active")'
+             VALUES (?, ?, ?, ?, "Active")'
         );
         // NOTE: the password is only seeded when the account is first created.
         // Existing accounts keep whatever password they currently have, so
@@ -80,11 +84,12 @@ function ensureAdminAccounts(PDO $pdo): void
                 continue;
             }
 
-            $createEmployee->execute([$admin['name'], $admin['department']]);
+            $createEmployee->execute([$admin['name'], $admin['position'], $admin['department']]);
             $createAccount->execute([
                 (int) $pdo->lastInsertId(),
                 $admin['username'],
                 password_hash($admin['password'], PASSWORD_DEFAULT),
+                $admin['position'],
             ]);
         }
         $pdo->commit();

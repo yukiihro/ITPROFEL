@@ -52,7 +52,8 @@ function isHrAdmin(array $u): bool
     $dept = strtolower($u['department'] ?? '');
     $pos  = strtolower($u['position'] ?? '');
     if ($role === 'administrator') return true;
-    if ($dept === 'hr' && ($role === 'hr admin' || $role === 'hr manager' || $pos === 'admin')) return true;
+    if ($dept === 'hr' && ($role === 'hr admin' || $role === 'hr manager'
+        || in_array($pos, ['admin', 'hr admin', 'hr manager', 'payroll admin'], true))) return true;
     return false;
 }
 
@@ -512,7 +513,7 @@ if ($action === 'register' && $method === 'POST') {
     $fullName   = trim((string)($b['fullName'] ?? ''));
     $email      = strtolower(trim((string)($b['email'] ?? '')));
     $department = trim((string)($b['department'] ?? ''));   // 'HR' or 'Finance'
-    $position   = trim((string)($b['position'] ?? ''));     // 'Admin' or 'Staff'
+    $position   = trim((string)($b['position'] ?? ''));     // 'HR Admin', 'HR Manager', or 'Payroll Admin' for HR
     $password   = (string)($b['password'] ?? '');
     $confirm    = (string)($b['confirmPassword'] ?? '');
 
@@ -522,7 +523,7 @@ if ($action === 'register' && $method === 'POST') {
 if (!in_array($department, ['HR', 'Finance', 'Procurement', 'Inventory', 'Sales', 'Production'], true)) {
     respond(['ok' => false, 'message' => 'Please select a valid department.'], 422);
 }
-    if (!in_array($position, ['Admin','Staff'], true)) {
+    if (!in_array($position, ['HR Admin', 'HR Manager', 'Payroll Admin', 'Admin', 'Staff', 'Buyer', 'Manager', 'Supervisor'], true)) {
         respond(['ok' => false, 'message' => 'Please select a valid position.'], 422);
     }
     if ($password !== $confirm) {
@@ -1240,7 +1241,7 @@ if ($action === 'users.create' && $method === 'POST') {
     $fullName   = trim((string)($b['fullName'] ?? ''));
     $email      = strtolower(trim((string)($b['email'] ?? '')));
     $phone      = trim((string)($b['phone'] ?? ''));
-    $position   = trim((string)($b['position'] ?? 'Staff'));
+    $position   = trim((string)($b['position'] ?? 'HR Admin'));
     $department = trim((string)($b['department'] ?? 'HR'));
     $salary     = (float)($b['salary'] ?? 0);
     $status     = trim((string)($b['status'] ?? 'Active'));
@@ -1266,10 +1267,14 @@ if ($action === 'users.create' && $method === 'POST') {
     if (!in_array($department, ['HR', 'Finance', 'Procurement', 'Inventory', 'Sales', 'Production'], true)) {
         respond(['ok' => false, 'message' => 'Invalid department.'], 422);
     }
-    // Position must match the department: Procurement accounts are Buyer/Manager,
-    // Inventory accounts use the real warehouse roles, every other department
-    // uses Staff/Admin.
-    if ($department === 'Procurement') {
+    // Position must match the department: HR accounts use HR Admin / HR Manager
+    // / Payroll Admin; Procurement is Buyer/Manager; Inventory uses warehouse
+    // roles; Production is Staff/Supervisor; others keep Staff/Admin.
+    if ($department === 'HR') {
+        if (!in_array($position, ['HR Admin', 'HR Manager', 'Payroll Admin'], true)) {
+            respond(['ok' => false, 'message' => 'HR accounts must use HR Admin, HR Manager, or Payroll Admin.'], 422);
+        }
+    } elseif ($department === 'Procurement') {
         if (!in_array($position, ['Buyer', 'Manager'], true)) {
             respond(['ok' => false, 'message' => 'Procurement accounts must be Buyer or Manager.'], 422);
         }

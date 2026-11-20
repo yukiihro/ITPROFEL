@@ -4055,7 +4055,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="settings-layout">
                     <div class="settings-tabs">
                         <button class="sett-tab active" data-tab="profile">My Profile</button>
-                        <button class="sett-tab" data-tab="password">Password &amp; Security</button>
                     </div>
                     <div class="settings-content">
                         <div class="sett-pane active" id="pane-profile">
@@ -4087,12 +4086,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <div class="sett-field"><label>Country</label><input id="sett-country" value="${escapeHtml(address.country)}" /></div><div class="sett-field"><label>City/State</label><input id="sett-city" value="${escapeHtml(address.city)}" /></div>
                                     <div class="sett-field"><label>Province</label><input id="sett-province" value="${escapeHtml(address.province)}" /></div><div class="sett-field"><label>Street No./Building</label><input id="sett-street" value="${escapeHtml(address.street)}" /></div><div class="sett-field"><label>Brgy</label><input id="sett-brgy" value="${escapeHtml(address.brgy)}" /></div>
                                 </div><div class="sett-actions"><button class="sett-btn-cancel" id="cancelAddressBtn">Cancel</button><button class="sett-btn-save" id="saveAddressBtn">Save Changes</button></div></div>
-                            </div>
-                        </div>
-                        <div class="sett-pane" id="pane-password">
-                            <div class="sett-section-head">Password &amp; Security</div>
-                            <div class="sett-card"><div class="sett-pass-header"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#111" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><div><h3>Change Password</h3><p>Keep your account safe and secure.</p></div></div>
-                                <div class="sett-pass-form"><input type="password" id="sett-current-pass" placeholder="Current Password" /><input type="password" id="sett-new-pass" placeholder="New Password" /><input type="password" id="sett-confirm-pass" placeholder="Confirm New Password" /><button class="sett-btn-save" id="settChangePassBtn">Upgrade Password</button></div>
                             </div>
                         </div>
                     </div>
@@ -4238,9 +4231,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
                             <strong style="font-size:13px;">I forgot my password.</strong>
                             <p style="margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#777;">
-                                Go to <a href="#" data-goto-page="settings">Settings</a> and use <em>Upgrade Password</em> —
-                                you will need your current password. If you cannot log in at all, ask an HR Administrator
-                                to reset it for you in <a href="#" data-goto-page="accountManagement">Account Management</a>.
+                                Ask an HR Administrator to reset it for you in
+                                <a href="#" data-goto-page="accountManagement">Account Management</a>.
                             </p>
                         </div>
                         <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
@@ -4938,21 +4930,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     saveStore('settings:updated');
                     renderPage('settings');
                     toast('Address updated.');
-                })();
-            });
-            $('#settChangePassBtn')?.addEventListener('click', (e) => {
-                if (!lockElement(e.currentTarget, 600)) return;
-                guard(async () => {
-                    const current = $('#sett-current-pass').value;
-                    const next = $('#sett-new-pass').value;
-                    const confirm = $('#sett-confirm-pass').value;
-                    if (!current || !next || !confirm) { toast('Please fill in all password fields.', 'error'); return; }
-                    if (next.length < 8) { toast('New password must be at least 8 characters.', 'error'); return; }
-                    if (next !== confirm) { toast('New passwords do not match.', 'error'); return; }
-                    try {
-                        const result = await apiRequest('password', { method: 'POST', body: JSON.stringify({ current, next }) });
-                        toast(result.message);
-                    } catch (error) { toast(error.message, 'error'); }
                 })();
             });
         }

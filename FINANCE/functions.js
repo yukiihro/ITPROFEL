@@ -4954,9 +4954,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="receivables-table-wrapper">
                 <div class="receivables-table-header">
                     <h3>Receivable Table</h3>
-                    <div class="receivables-actions">
-                        ${canManageRecords() ? '<button class="btn btn-primary btn-sm" type="button" id="addArBtn" style="background:#a01515; border-radius:6px; padding: 8px 16px; color:#fff; border:none; cursor:pointer;">+ Add Invoice</button>' : ''}
-                    </div>
+                    <div class="receivables-actions"></div>
                 </div>
                 
                 <div class="receivables-table-inner">
@@ -8127,7 +8125,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <!-- Left Sidebar Tabs -->
                     <div class="settings-tabs">
                         <button class="sett-tab active" data-tab="profile">My Profile</button>
-                        <button class="sett-tab" data-tab="password">Password & Security</button>
                     </div>
 
                     <!-- Right Content Area -->
@@ -8203,27 +8200,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <button class="sett-btn-cancel" id="cancelAddressBtn">Cancel</button>
                                         <button class="sett-btn-save" id="saveAddressBtn">Save Changes</button>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- PASSWORD & SECURITY TAB -->
-                        <div class="sett-pane" id="pane-password">
-                            <div class="sett-section-head">Password & Security</div>
-                            
-                            <div class="sett-card">
-                                <div class="sett-pass-header">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                                    <div>
-                                        <h3>Change Password</h3>
-                                        <p>Keep your account safe and secure.</p>
-                                    </div>
-                                </div>
-                                <div class="sett-pass-form">
-                                    <input type="password" id="sett-current-pass" placeholder="Current Password" />
-                                    <input type="password" id="sett-new-pass" placeholder="New Password" />
-                                    <input type="password" id="sett-confirm-pass" placeholder="Confirm New Password" />
-                                    <button class="sett-btn-save" id="settChangePassBtn">Upgrade Password</button>
                                 </div>
                             </div>
                         </div>
@@ -8381,10 +8357,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderReceivableRows();
             $('#arSearch')?.addEventListener('input', throttle(guard(() => { finResetPage('ar'); renderReceivableRows(); }), 100));
             $('#arStatus')?.addEventListener('change', throttle(guard(() => { finResetPage('ar'); renderReceivableRows(); }), 100));
-            $('#addArBtn')?.addEventListener('click', (e) => {
-                if (!lockElement(e.currentTarget, 500)) return;
-                guard(() => openReceivableForm())();
-            });
             $('#arTbody')?.addEventListener('click', throttle(guard(handleReceivableAction), 120));
             bindFinPagination('#arPagination', 'ar', guard(renderReceivableRows));
         }
@@ -8782,29 +8754,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 })();
             });
 
-            // Change Password
-            $('#settChangePassBtn')?.addEventListener('click', (e) => {
-                if (!lockElement(e.currentTarget, 600)) return;
-                guard(async () => {
-                    const current = $('#sett-current-pass').value;
-                    const next = $('#sett-new-pass').value;
-                    const confirm = $('#sett-confirm-pass').value;
-                    
-                    if (!current || !next || !confirm) { toast('Please fill in all password fields.', 'error'); return; }
-                    if (next.length < 8) { toast('New password must be at least 8 characters.', 'error'); return; }
-                    if (next !== confirm) { toast('New passwords do not match.', 'error'); return; }
-                    
-                    try {
-                        const result = await apiRequest('password', { method: 'POST', body: JSON.stringify({ current, next }) });
-                        $('#sett-current-pass').value = '';
-                        $('#sett-new-pass').value = '';
-                        $('#sett-confirm-pass').value = '';
-                        toast(result.message);
-                    } catch (error) {
-                        toast(error.message, 'error');
-                    }
-                })();
-            });
         }
 
         if (page === 'account') {

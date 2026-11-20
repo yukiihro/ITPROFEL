@@ -488,22 +488,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // HR department positions. Admin was renamed to HR Admin; Staff was
-    // removed. HR Manager and Payroll Admin are the two new HR positions.
-    // Other departments keep their own role sets (see positionOptionsFor).
-    const HR_POSITIONS = ['HR Admin', 'HR Manager', 'Payroll Admin'];
+    // Canonical positions for HR and Finance. Other departments keep their
+    // own role sets (see positionOptionsFor).
+    const HR_POSITIONS = ['HR Admin', 'HR Manager', 'HR Staff', 'Payroll Officer'];
+    const FINANCE_POSITIONS = ['Finance Admin', 'Finance Manager', 'Finance Staff', 'Cashier', 'Finance Employee'];
     const WAREHOUSE_POSITIONS = ['Warehouse Manager', 'Inventory Staff', 'Warehouse Staff', 'Inventory Controller', 'Picker and Packer', 'Shipping and Receiving Clerk'];
-    const ALL_POSITIONS = [...HR_POSITIONS, 'Staff', 'Buyer', 'Manager', 'Supervisor', ...WAREHOUSE_POSITIONS];
+    // 'Admin'/'Staff' remain here for Sales and Production accounts.
+    const ALL_POSITIONS = [...HR_POSITIONS, ...FINANCE_POSITIONS, 'Admin', 'Staff', 'Buyer', 'Manager', 'Supervisor', ...WAREHOUSE_POSITIONS];
     const positionOptionsFor = (dept) =>
         dept === 'HR' ? HR_POSITIONS
+        : dept === 'Finance' ? FINANCE_POSITIONS
         : dept === 'Inventory' ? WAREHOUSE_POSITIONS
         : dept === 'Procurement' ? ['Buyer', 'Manager']
         : dept === 'Production' ? ['Staff', 'Supervisor']
         : ['Staff', 'Admin'];
 
+    // Only HR Admin and HR Manager manage HR records. HR Staff and Payroll
+    // Officer are non-admin positions.
+    const HR_ADMIN_POSITIONS = ['HR Admin', 'HR Manager'];
     const isHrAdmin = () => ['Administrator', 'HR Manager', 'HR Admin'].includes(activeUser?.role)
         || (String(activeUser?.department || '').toLowerCase() === 'hr'
-            && (/admin/i.test(String(activeUser?.position || '')) || HR_POSITIONS.includes(activeUser?.position)));
+            && (HR_ADMIN_POSITIONS.includes(activeUser?.position)
+                || String(activeUser?.position || '').toLowerCase() === 'admin'));
     const canManageRecords = () => isHrAdmin();
 
     let pageAccessCache = null;
@@ -5262,8 +5268,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const depts = ['HR', 'Finance', 'Procurement', 'Inventory', 'Sales', 'Production'];
         const today = todayDateString();
         const val = (name, fallback = '') => escapeHtml(String(prefill[name] ?? fallback));
-        // HR uses HR Admin / HR Manager / Payroll Admin; other departments
-        // keep their own role sets (shared helper near the top of this file).
+        // HR and Finance use their own position sets; other departments keep
+        // their own role sets (shared helper near the top of this file).
         const positionOptions = positionOptionsFor;
         const initialPos = positionOptions(prefill.department || 'HR');
 
@@ -5369,9 +5375,9 @@ document.addEventListener('DOMContentLoaded', () => {
             `
         });
 
-        // Department drives the Position options: HR → HR Admin/HR Manager/
-        // Payroll Admin; other departments keep their own roles. Rebuild the
-        // searchable dropdown when the department changes.
+        // Department drives the Position options: HR and Finance each use
+        // their own role set; other departments keep their own roles. Rebuild
+        // the searchable dropdown when the department changes.
         const deptSel = modalBody.querySelector('[name="department"]');
         const posSel = modalBody.querySelector('[name="position"]');
         const refreshPositionOptions = () => {

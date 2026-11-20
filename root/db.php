@@ -41,7 +41,7 @@ function ensureAdminAccounts(PDO $pdo): void
             'password' => getenv('FINANCE_ADMIN_PASSWORD') ?: 'Admin123456789!',
             'name' => 'Finance Administrator',
             'department' => 1,
-            'position' => 'Admin',
+            'position' => 'Finance Admin',
         ],
     ];
 
@@ -57,7 +57,7 @@ function ensureAdminAccounts(PDO $pdo): void
              VALUES (?, ?, ?, "Active", 0, CURDATE())'
         );
         // Do not overwrite an existing admin's position here — HR manages it
-        // (HR admins use "HR Admin", Finance admins keep "Admin").
+        // (HR admins use "HR Admin", Finance admins use "Finance Admin").
         $updateEmployee = $pdo->prepare(
             'UPDATE employees
              SET name = ?, department = ?, employment_status = "Active"

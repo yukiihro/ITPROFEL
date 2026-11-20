@@ -40,7 +40,7 @@ function isHrAdmin(array $u): bool
     $pos  = strtolower($u['position'] ?? '');
     return $role === 'administrator'
         || ($dept === 'hr' && ($role === 'hr admin' || $role === 'hr manager'
-            || in_array($pos, ['admin', 'hr admin', 'hr manager', 'payroll admin'], true)));
+            || in_array($pos, ['admin', 'hr admin', 'hr manager'], true)));
 }
 
 function isFinanceAdmin(array $u): bool
@@ -49,7 +49,8 @@ function isFinanceAdmin(array $u): bool
     $dept = strtolower($u['department'] ?? '');
     $pos  = strtolower($u['position'] ?? '');
     return $role === 'administrator'
-        || ($dept === 'finance' && ($role === 'finance admin' || $pos === 'admin'));
+        || ($dept === 'finance' && ($role === 'finance admin' || $role === 'finance manager'
+            || in_array($pos, ['admin', 'finance admin', 'finance manager'], true)));
 }
 
 /* Re-authentication: sensitive Finance actions ask for the signed-in user's

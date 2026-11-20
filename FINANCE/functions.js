@@ -349,13 +349,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const canManageRecords = () => {
         const role = String(activeUser?.role || '').toLowerCase();
         const position = String(activeUser?.position || '').toLowerCase();
-        return position === 'admin' || role === 'administrator' || role.includes('finance admin') || role.includes('finance manager');
+        return position === 'admin' || position === 'finance admin' || position === 'finance manager'
+            || role === 'administrator' || role.includes('finance admin') || role.includes('finance manager');
     };
 
     const canExportRecords = () => {
         const role = String(activeUser?.role || '').toLowerCase();
         const position = String(activeUser?.position || '').toLowerCase();
-        return position === 'admin' || role === 'administrator' || role.includes('finance admin') || role.includes('finance manager');
+        return position === 'admin' || position === 'finance admin' || position === 'finance manager'
+            || role === 'administrator' || role.includes('finance admin') || role.includes('finance manager');
     };
 
     const canViewAudit = () => {
@@ -416,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const HR_ADMIN_POSITIONS = ['HR Admin', 'HR Manager', 'Payroll Admin'];
+    const HR_ADMIN_POSITIONS = ['HR Admin', 'HR Manager'];
     const isHrAdmin = () => ['Administrator', 'HR Manager', 'HR Admin'].includes(activeUser?.role)
         || (String(activeUser?.department || '').toLowerCase() === 'hr'
             && (HR_ADMIN_POSITIONS.includes(activeUser?.position)

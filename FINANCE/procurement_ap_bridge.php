@@ -25,7 +25,7 @@ function apUser(): array {
     $department = strtolower(trim((string)($u['department'] ?? '')));
     $role = strtolower(trim((string)($u['role'] ?? '')));
     $position = strtolower(trim((string)($u['position'] ?? '')));
-    if ($role !== 'administrator' && !($department === 'finance' && in_array($position, ['admin','manager'], true))) {
+    if ($role !== 'administrator' && !($department === 'finance' && in_array($position, ['admin','finance admin','finance manager','manager'], true))) {
         apReply(403, ['ok'=>false, 'message'=>'Only a Finance Admin or Manager can use the Procurement invoice inbox.']);
     }
     return $u;

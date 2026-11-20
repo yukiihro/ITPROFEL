@@ -20,42 +20,7 @@
     { match: "metalcraft", file: "metalcraft.svg", short: "metalcraft" }
   ];
 
-  // Read-only catalog price preview. Values mirror the static fallback prices
-  // currently displayed by supplier/catalog.js when its PHP catalog is unavailable.
-  // They are NOT actual quotations and are NOT saved by this preview page.
-  
-const catalogProducts = [
-    "full-grain leather",
-    "black leather",
-    "nubuck leather",
-    "mesh fabric",
-    "canvas fabric",
-    "pu leather",
-    "rubber sole",
-    "eva foam sheets",
-    "foam insole",
-    "metal eyelets",
-    "metal buckles",
-    "shoelaces",
-    "shoe boxes (eco friendly)",
-    "tissue paper rolls",
-    "packaging tape",
-    "shoes adhesive"
-];
-
-  const catalogRates = {
-    marikina:   [240,235,260,128,97,148,510,128,318,82,35,26,12.5,0.86,46,152],
-    cordillera: [
-    235, 250, 252, 130,
-    98, 152, 515, 130,
-    322, 85, 36, 27,
-    13, 0.88, 48, 155
-],
-    synthhide:  [245,240,258,125,95,145,508,126,316,81,34.5,25.5,12.3,0.85,45.5,151],
-    soletech:   [242,238,262,127,96,149,505,125,320,83,35.5,26.5,12.4,0.86,46.5,150],
-    metalcraft: [244,245,264,129,97,147,512,128,315,80,34.5,25.5,12.6,0.86,46,152],
-    ecobox:     [242,238,262,127,96,149,505,125,320,83,35.5,26.5,12.4,0.86,46.5,150]
-  };
+  // Live quotation prices always come from the verified supplier_items rows in MySQL.
   const normalize = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
   function supplierKey(name) {
@@ -63,17 +28,13 @@ const catalogProducts = [
     return supplierVisuals.find((v) => normalized.includes(v.match)) || null;
   }
   function catalogPrice(supplier, item) {
-    const key = supplierKey(supplier.name)?.short;
-    const index = catalogProducts.findIndex((name) => normalize(name) === normalize(item.item_name));
-    if (key && index !== -1 && catalogRates[key]) return catalogRates[key][index];
-    // Other catalog products may exist in MySQL but not in the visual fallback list.
-    if (item.unit_price !== null && item.unit_price !== undefined && item.unit_price !== "" &&
-        Number.isFinite(Number(item.unit_price)) && Number(item.unit_price) >= 0) {
+    // No guessed/static rates. Quotes must agree with supplier_items in MySQL.
+    if (item.supplier_item_id != null && item.unit_price !== null && item.unit_price !== undefined &&
+        item.unit_price !== '' && Number.isFinite(Number(item.unit_price)) && Number(item.unit_price) >= 0) {
       return Number(item.unit_price);
     }
     return null;
   }
-
   function makeElement(tag, className, text) {
     const element = document.createElement(tag);
     if (className) element.className = className;

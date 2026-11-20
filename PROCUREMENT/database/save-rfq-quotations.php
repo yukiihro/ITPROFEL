@@ -3,6 +3,7 @@
 header('Content-Type: application/json; charset=utf-8');
 if (session_status() !== PHP_SESSION_ACTIVE) require_once __DIR__ . '/uniprocur-session.php';
 require_once __DIR__ . '/procurement_db_connection.php';
+require_once __DIR__ . '/supplier-catalog-match.php';
 function respond($status, $data) { http_response_code($status); echo json_encode($data, JSON_UNESCAPED_UNICODE); exit; }
 function unitKey($unit) {
     $u = strtolower(trim((string)$unit));
@@ -46,16 +47,22 @@ try {
     }
     // Validate ALL items/suppliers and prices before any inserts.
     $s=$conn->prepare('SELECT id, item_name, unit, unit_price FROM supplier_items WHERE supplier_id=? AND is_active=1');
-    $ready=[]; $missing=[];
+    $ready=[]; $missing=[]; $aliases=[];
     foreach ($quotes as $q) {
         $sid=(int)$q['supplier_id']; $s->bind_param('i',$sid); $s->execute(); $catalog=$s->get_result()->fetch_all(MYSQLI_ASSOC);
         $lines=[];
         foreach ($items as $item) {
-            $match=null;
-            foreach ($catalog as $entry) {
-                if (nameKey($entry['item_name']) === nameKey($item['item_name']) && unitKey($entry['unit']) === unitKey($item['unit'])) { $match=$entry; break; }
+            $resolution = uniFindSupplierCatalogMatch($catalog, (string)$item['item_name'], (string)$item['unit']);
+            $match = $resolution['item'];
+            if (!$match) { $missing[]=$q['name'].': '.$item['item_name'].' ('.$item['unit'].') ['.$resolution['issue'].']'; continue; }
+            if ($resolution['type'] === 'alias') {
+                $aliases[] = [
+                    'supplier' => $q['name'],
+                    'requested' => $item['item_name'],
+                    'catalog' => $match['item_name'],
+                    'unit' => $item['unit']
+                ];
             }
-            if (!$match) { $missing[]=$q['name'].': '.$item['item_name'].' ('.$item['unit'].')'; continue; }
             $qty=(float)$item['qty']; $price=(float)$match['unit_price'];
             if (!is_finite($qty) || $qty <= 0 || !is_finite($price) || $price < 0) { $missing[]=$q['name'].': invalid quantity/price for '.$item['item_name']; continue; }
             $lines[]=['supplier_item_id'=>(int)$match['id'],'name'=>$item['item_name'],'unit'=>$item['unit'],'qty'=>$qty,'price'=>$price];
@@ -66,6 +73,16 @@ try {
     if ($missing) {
         $conn->rollback(); $started=false;
         respond(422, ['success'=>false,'code'=>'MISSING_CATALOG_ITEMS','message'=>'Some supplier items are missing from MySQL. Add matching product names and units in supplier_items before saving.','missing'=>$missing]);
+    }
+    // A catalog variant must never be silently treated as the same ordered product.
+    if ($aliases && ($payload['confirm_catalog_aliases'] ?? null) !== true) {
+        $conn->rollback(); $started=false;
+        respond(409, [
+            'success'=>false,
+            'code'=>'CATALOG_ALIAS_CONFIRMATION_REQUIRED',
+            'message'=>'Confirm the supplier-specific catalog variant before saving the RFQ.',
+            'aliases'=>$aliases
+        ]);
     }
     // subtotal is a STORED GENERATED column: do not insert it explicitly.
     $lineStmt=$conn->prepare('INSERT INTO rfq_quote_items (rfq_quote_id, supplier_item_id, item_name, unit, qty, unit_price) VALUES (?, ?, ?, ?, ?, ?)');

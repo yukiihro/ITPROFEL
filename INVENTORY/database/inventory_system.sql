@@ -1,22 +1,40 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Nov 15, 2026 at 03:06 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
 
 
-;
-;
-;
-;
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
 
+--
+-- Database: `inventory_system`
+--
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `app_migrations`
+--
 
 CREATE TABLE `app_migrations` (
   `name` varchar(100) NOT NULL,
   `applied_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `app_migrations`
+--
 
 INSERT INTO `app_migrations` (`name`, `applied_at`) VALUES
 ('catalog_v1', '2026-11-14 17:58:16'),
@@ -26,7 +44,11 @@ INSERT INTO `app_migrations` (`name`, `applied_at`) VALUES
 ('secondary_raw_material_stock_50_v1', '2026-11-14 17:58:17'),
 ('transfer_completed_to_delivered_v1', '2026-11-14 17:58:16');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `categories`
+--
 
 CREATE TABLE `categories` (
   `id` int(11) NOT NULL,
@@ -34,13 +56,20 @@ CREATE TABLE `categories` (
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `categories`
+--
 
 INSERT INTO `categories` (`id`, `category_name`, `status`) VALUES
 (1, 'Footwear', 'Active'),
 (2, 'Shoes', 'Active'),
 (7, 'Raw Materials', 'Active');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `deliveries`
+--
 
 CREATE TABLE `deliveries` (
   `id` int(11) NOT NULL,
@@ -57,6 +86,9 @@ CREATE TABLE `deliveries` (
   `receipt_confirmed_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `deliveries`
+--
 
 INSERT INTO `deliveries` (`id`, `request_id`, `status`, `expected_days`, `expected_date`, `shipped_date`, `out_for_delivery_date`, `delivered_date`, `received_date`, `remarks`, `updated_at`, `receipt_confirmed_at`) VALUES
 (1, 1, 'Delivered', '5-7 days', NULL, '2026-11-15', '2026-11-15', '2026-11-15', '2026-11-15', NULL, '2026-11-14 18:07:05', '2026-11-15 02:07:05'),
@@ -66,7 +98,11 @@ INSERT INTO `deliveries` (`id`, `request_id`, `status`, `expected_days`, `expect
 (6, 5, 'Delivered', '2-3 days', '2026-11-15', '2026-11-15', '2026-11-15', '2026-11-15', '2026-11-15', NULL, '2026-11-14 18:04:33', NULL),
 (7, 6, 'Delivered', '2-3 days', '2026-11-15', '2026-11-15', '2026-11-15', '2026-11-15', '2026-11-15', NULL, '2026-11-14 18:04:35', NULL);
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `delivery_receipts`
+--
 
 CREATE TABLE `delivery_receipts` (
   `id` int(11) NOT NULL,
@@ -80,6 +116,9 @@ CREATE TABLE `delivery_receipts` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `delivery_receipts`
+--
 
 INSERT INTO `delivery_receipts` (`id`, `dr_number`, `delivery_id`, `request_id`, `receipt_date`, `received_by`, `received_date`, `remarks`, `created_at`) VALUES
 (1, 'DR-20261114190425-3', 3, 2, '2026-11-15', 'Production Team', '2026-11-15', NULL, '2026-11-14 18:04:25'),
@@ -89,7 +128,11 @@ INSERT INTO `delivery_receipts` (`id`, `dr_number`, `delivery_id`, `request_id`,
 (5, 'DR-20261114190435-7', 7, 6, '2026-11-15', 'Production Team', '2026-11-15', NULL, '2026-11-14 18:04:35'),
 (6, 'DR-20261114190705-1', 1, 1, '2026-11-15', 'Suficiencia Andrew C', '2026-11-15', NULL, '2026-11-14 18:07:05');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `finished_goods`
+--
 
 CREATE TABLE `finished_goods` (
   `fg_id` int(11) NOT NULL,
@@ -106,6 +149,9 @@ CREATE TABLE `finished_goods` (
   `quantity` int(11) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `finished_goods`
+--
 
 INSERT INTO `finished_goods` (`fg_id`, `item_code`, `item_name`, `brand`, `size`, `category_id`, `unit`, `description`, `reorder_level`, `status`, `created_at`, `quantity`) VALUES
 (17, 'FG-001', 'Quick Step Classic Low', 'Quick Step', '26', 1, 'pairs', 'Quick Step footwear product', 10, 'Active', '2026-11-14 17:58:16', 100),
@@ -189,7 +235,11 @@ INSERT INTO `finished_goods` (`fg_id`, `item_code`, `item_name`, `brand`, `size`
 (95, 'FG-004-S44', 'Quick Step Urban Walk', 'Quick Step', '44', 1, 'pairs', 'Quick Step footwear demo inventory record', 10, 'Active', '2026-11-14 17:58:16', 100),
 (96, 'FG-004-S45', 'Quick Step Urban Walk', 'Quick Step', '45', 1, 'pairs', 'Quick Step footwear demo inventory record', 10, 'Active', '2026-11-14 17:58:16', 100);
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `inventory`
+--
 
 CREATE TABLE `inventory` (
   `id` int(11) NOT NULL,
@@ -198,6 +248,9 @@ CREATE TABLE `inventory` (
   `quantity` int(11) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `inventory`
+--
 
 INSERT INTO `inventory` (`id`, `item_id`, `warehouse_id`, `quantity`) VALUES
 (1, 1, 1, 45),
@@ -393,6 +446,9 @@ INSERT INTO `inventory` (`id`, `item_id`, `warehouse_id`, `quantity`) VALUES
 (199, 96, 1, 50),
 (200, 96, 2, 50);
 
+--
+-- Triggers `inventory`
+--
 DELIMITER $$
 CREATE TRIGGER `trg_inventory_ad` AFTER DELETE ON `inventory` FOR EACH ROW BEGIN
   UPDATE finished_goods SET quantity=(SELECT COALESCE(SUM(inv.quantity),0) FROM inventory inv WHERE inv.item_id=OLD.item_id) WHERE fg_id=OLD.item_id;
@@ -415,7 +471,11 @@ END
 $$
 DELIMITER ;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `items`
+--
 
 CREATE TABLE `items` (
   `id` int(11) NOT NULL,
@@ -433,6 +493,9 @@ CREATE TABLE `items` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `items`
+--
 
 INSERT INTO `items` (`id`, `item_code`, `item_name`, `brand`, `supplier_name`, `size`, `item_type`, `category_id`, `unit`, `description`, `reorder_level`, `status`, `created_at`) VALUES
 (1, 'RM-001', 'Full-Grain Leather', '', 'Marikina Hide & Leather Co.', '', 'Raw Material', 7, 'square feet', 'Shoe manufacturing raw material', 10, 'Active', '2026-11-14 17:58:16'),
@@ -532,6 +595,9 @@ INSERT INTO `items` (`id`, `item_code`, `item_name`, `brand`, `supplier_name`, `
 (95, 'FG-004-S44', 'Quick Step Urban Walk', 'Quick Step', '', '44', 'Finished Good', 1, 'pairs', 'Quick Step footwear demo inventory record', 10, 'Active', '2026-11-14 17:58:16'),
 (96, 'FG-004-S45', 'Quick Step Urban Walk', 'Quick Step', '', '45', 'Finished Good', 1, 'pairs', 'Quick Step footwear demo inventory record', 10, 'Active', '2026-11-14 17:58:16');
 
+--
+-- Triggers `items`
+--
 DELIMITER $$
 CREATE TRIGGER `trg_items_ai` AFTER INSERT ON `items` FOR EACH ROW BEGIN
   IF NEW.item_type='Raw Material' THEN
@@ -566,7 +632,11 @@ END
 $$
 DELIMITER ;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `notifications`
+--
 
 CREATE TABLE `notifications` (
   `id` int(11) NOT NULL,
@@ -578,6 +648,9 @@ CREATE TABLE `notifications` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `notifications`
+--
 
 INSERT INTO `notifications` (`id`, `title`, `message`, `type`, `actor_user_id`, `recipient_user_id`, `created_at`) VALUES
 (1, 'New Request', 'Request REQ-2026111418595560 with 1 item(s) was submitted for Production.', 'request', 3, 1, '2026-11-14 17:59:55'),
@@ -643,7 +716,11 @@ INSERT INTO `notifications` (`id`, `title`, `message`, `type`, `actor_user_id`, 
 (61, 'Delivery Complete', 'Delivery REQ-2026111418595560 is complete.', 'delivery', 3, 1, '2026-11-14 18:07:05'),
 (62, 'Delivery Complete', 'Delivery REQ-2026111418595560 is complete.', 'delivery', 3, 6, '2026-11-14 18:07:05');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `notification_reads`
+--
 
 CREATE TABLE `notification_reads` (
   `notification_id` int(11) NOT NULL,
@@ -651,6 +728,9 @@ CREATE TABLE `notification_reads` (
   `read_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `notification_reads`
+--
 
 INSERT INTO `notification_reads` (`notification_id`, `user_id`, `read_at`) VALUES
 (3, 3, '2026-11-14 18:02:09'),
@@ -668,7 +748,11 @@ INSERT INTO `notification_reads` (`notification_id`, `user_id`, `read_at`) VALUE
 (57, 3, '2026-11-14 19:26:28'),
 (59, 3, '2026-11-14 19:26:28');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `raw_materials`
+--
 
 CREATE TABLE `raw_materials` (
   `id` int(11) NOT NULL,
@@ -684,6 +768,9 @@ CREATE TABLE `raw_materials` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `raw_materials`
+--
 
 INSERT INTO `raw_materials` (`id`, `item_code`, `item_name`, `brand`, `supplier_name`, `category_id`, `unit`, `description`, `reorder_level`, `status`, `created_at`) VALUES
 (1, 'RM-001', 'Full-Grain Leather', '', 'Marikina Hide & Leather Co.', 7, 'square feet', 'Shoe manufacturing raw material', 10, 'Active', '2026-11-14 17:58:16'),
@@ -703,7 +790,11 @@ INSERT INTO `raw_materials` (`id`, `item_code`, `item_name`, `brand`, `supplier_
 (15, 'RM-015', 'Packaging Tape', '', 'EcoBox Packaging Solutions', 7, 'rolls', 'Shoe manufacturing raw material', 10, 'Active', '2026-11-14 17:58:16'),
 (16, 'RM-016', 'Shoe Adhesive', '', 'SynthHide Textile Corp.', 7, 'liters', 'Shoe manufacturing raw material', 10, 'Active', '2026-11-14 17:58:16');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `requests`
+--
 
 CREATE TABLE `requests` (
   `id` int(11) NOT NULL,
@@ -723,6 +814,9 @@ CREATE TABLE `requests` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `requests`
+--
 
 INSERT INTO `requests` (`id`, `request_number`, `requested_by`, `requester_team`, `request_date`, `status`, `remarks`, `recipient_name`, `recipient_gmail`, `destination`, `po_number`, `expected_receive_date`, `approved_by`, `approved_at`, `created_at`) VALUES
 (1, 'REQ-2026111418595560', 3, 'Inventory', '2026-11-15', 'Approved', '', 'Andrew', 'andrewsuficiencia09@gmail.com', 'Production', 'PO-1042', NULL, NULL, '2026-11-15 02:00:09', '2026-11-14 17:59:55'),
@@ -732,7 +826,11 @@ INSERT INTO `requests` (`id`, `request_number`, `requested_by`, `requester_team`
 (5, 'REQ-2026111419032232', NULL, 'Production', '2026-11-15', 'Approved', 'Production PO-1042 — material request | Size: 29 cm (by Production Staff) | Email: team3production@gmail.com', 'TEAM 3', 'team3production@gmail.com', 'Production', 'PO-1042', '2026-11-15', 3, '2026-11-15 02:03:33', '2026-11-14 18:03:22'),
 (6, 'REQ-2026111419032235', NULL, 'Production', '2026-11-15', 'Approved', 'Production PO-1042 — material request | Size: 29 cm (by Production Staff) | Email: team3production@gmail.com', 'TEAM 3', 'team3production@gmail.com', 'Production', 'PO-1042', '2026-11-15', 3, '2026-11-15 02:03:30', '2026-11-14 18:03:22');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `request_items`
+--
 
 CREATE TABLE `request_items` (
   `id` int(11) NOT NULL,
@@ -753,6 +851,9 @@ CREATE TABLE `request_items` (
   `unit` varchar(30) DEFAULT 'pcs'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `request_items`
+--
 
 INSERT INTO `request_items` (`id`, `request_id`, `item_id`, `item_name`, `size`, `warehouse_id`, `quantity`, `approved_quantity`, `rejected_quantity`, `rejection_reason`, `delivered_quantity`, `accepted_quantity`, `inspection_accepted_quantity`, `inspection_rejected_quantity`, `inspection_rejection_reason`, `unit`) VALUES
 (1, 1, 42, 'Quick Step Street Runner', '29', 1, 5, 5, 0, '', 5, 5, 5, 0, '', 'pairs'),
@@ -762,7 +863,11 @@ INSERT INTO `request_items` (`id`, `request_id`, `item_id`, `item_name`, `size`,
 (5, 5, 16, 'Shoe Adhesive', '', 1, 5, 5, 0, '', 5, 5, 5, 0, '', 'liters'),
 (6, 6, 12, 'Shoelaces', '', 1, 5, 5, 0, '', 5, 5, 5, 0, '', 'pieces');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `sales_returns`
+--
 
 CREATE TABLE `sales_returns` (
   `id` int(11) NOT NULL,
@@ -781,7 +886,11 @@ CREATE TABLE `sales_returns` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `sales_return_items`
+--
 
 CREATE TABLE `sales_return_items` (
   `id` int(11) NOT NULL,
@@ -801,7 +910,11 @@ CREATE TABLE `sales_return_items` (
   `inspected_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `stock_adjustments`
+--
 
 CREATE TABLE `stock_adjustments` (
   `id` int(11) NOT NULL,
@@ -817,7 +930,11 @@ CREATE TABLE `stock_adjustments` (
   `user_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `stock_in`
+--
 
 CREATE TABLE `stock_in` (
   `id` int(11) NOT NULL,
@@ -833,11 +950,18 @@ CREATE TABLE `stock_in` (
   `user_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `stock_in`
+--
 
 INSERT INTO `stock_in` (`id`, `stock_in_number`, `item_id`, `warehouse_id`, `quantity`, `unit`, `supplier`, `reference_number`, `remarks`, `date`, `user_id`) VALUES
 (1, 'SIN-1-1-5', 42, 1, 5, 'pairs', '', 'REQ-2026111418595560', 'Received from Production; Request REQ-2026111418595560; P.O. PO-1042; accepted quantity cumulative 5', '2026-11-14', 3);
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `stock_movements`
+--
 
 CREATE TABLE `stock_movements` (
   `id` int(11) NOT NULL,
@@ -852,6 +976,9 @@ CREATE TABLE `stock_movements` (
   `user_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `stock_movements`
+--
 
 INSERT INTO `stock_movements` (`id`, `item_id`, `warehouse_id`, `movement_type`, `quantity`, `unit`, `reference_number`, `remarks`, `date`, `user_id`) VALUES
 (1, 1, 1, 'STOCK IN', 50, NULL, 'OPENING-CATALOG-1', 'Opening stock - catalog setup', '2000-01-01', NULL),
@@ -1221,7 +1348,11 @@ INSERT INTO `stock_movements` (`id`, `item_id`, `warehouse_id`, `movement_type`,
 (68365, 8, 1, 'STOCK OUT', 5, NULL, 'REQ-2026111419032211', 'Stock out for approved quantity', '2026-11-14', 3),
 (95406, 42, 1, 'STOCK IN', 5, 'pairs', 'REQ-2026111418595560', 'Received from Production; Request REQ-2026111418595560; P.O. PO-1042; accepted quantity cumulative 5', '2026-11-14', 3);
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `stock_out`
+--
 
 CREATE TABLE `stock_out` (
   `id` int(11) NOT NULL,
@@ -1237,6 +1368,9 @@ CREATE TABLE `stock_out` (
   `user_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `stock_out`
+--
 
 INSERT INTO `stock_out` (`id`, `stock_out_number`, `item_id`, `warehouse_id`, `quantity`, `purpose`, `destination`, `reference_number`, `remarks`, `date`, `user_id`) VALUES
 (1, 'SOUT-20261114190330-6-1', 12, 1, 5, 'Approved Request', 'Production', 'REQ-2026111419032235', 'Automatic stock out for approved request - Main Warehouse', '2026-11-14', 3),
@@ -1245,7 +1379,11 @@ INSERT INTO `stock_out` (`id`, `stock_out_number`, `item_id`, `warehouse_id`, `q
 (4, 'SOUT-20261114190341-3-1', 1, 1, 5, 'Approved Request', 'Production', 'REQ-2026111419032236', 'Automatic stock out for approved request - Main Warehouse', '2026-11-14', 3),
 (5, 'SOUT-20261114190345-2-1', 8, 1, 5, 'Approved Request', 'Production', 'REQ-2026111419032211', 'Automatic stock out for approved request - Main Warehouse', '2026-11-14', 3);
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `stock_transfers`
+--
 
 CREATE TABLE `stock_transfers` (
   `id` int(11) NOT NULL,
@@ -1261,7 +1399,11 @@ CREATE TABLE `stock_transfers` (
   `status` enum('Pending','Completed','Cancelled','Delivered') NOT NULL DEFAULT 'Delivered'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `stock_transfer_items`
+--
 
 CREATE TABLE `stock_transfer_items` (
   `id` int(11) NOT NULL,
@@ -1270,7 +1412,11 @@ CREATE TABLE `stock_transfer_items` (
   `quantity` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `supplier_rejections`
+--
 
 CREATE TABLE `supplier_rejections` (
   `id` int(11) NOT NULL,
@@ -1290,7 +1436,11 @@ CREATE TABLE `supplier_rejections` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `supplier_rejection_items`
+--
 
 CREATE TABLE `supplier_rejection_items` (
   `id` int(11) NOT NULL,
@@ -1302,11 +1452,14 @@ CREATE TABLE `supplier_rejection_items` (
   `accepted_quantity` int(11) NOT NULL DEFAULT 0,
   `rejected_quantity` int(11) NOT NULL DEFAULT 0,
   `unit` varchar(30) NOT NULL DEFAULT 'pcs',
-  `rejection_reason` varchar(500) DEFAULT '',
-  `item_action` varchar(30) NOT NULL DEFAULT 'Inspection Reject'
+  `rejection_reason` varchar(500) DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `users`
+--
 
 CREATE TABLE `users` (
   `id` int(11) NOT NULL,
@@ -1319,6 +1472,9 @@ CREATE TABLE `users` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `users`
+--
 
 INSERT INTO `users` (`id`, `full_name`, `email`, `username`, `password`, `role`, `position`, `created_at`) VALUES
 (1, 'Admin', 'admin@inventory.local', 'admin', '$2y$12$JyHQtJmXH9hWrIVVsP3d1uSPoSn62ORz9TAz46idnZPiXw0ReTQYm', 'ADMIN', NULL, '2026-11-14 17:58:15'),
@@ -1329,7 +1485,11 @@ INSERT INTO `users` (`id`, `full_name`, `email`, `username`, `password`, `role`,
 (7, 'Mendoza Franz Gian T.', 'mendoza@inventory.local', 'mendoza', '$2y$12$snEPb/7FKtjcxmfMBthY.OV3o5aXrRdIIvkkA0N2s9Uz2Kn0Z0rL.', 'USER', 'Picker and Packer', '2026-11-14 17:58:15'),
 (8, 'Pompa, Eric Joseph F.', 'pompa@inventory.local', 'pompa', '$2y$12$kOAIT.ws9rddrw4CPsMMROggmnBKZgy6I2eiBFLerXoUATm/seq7S', 'USER', 'Shipping and Receiving Clerk', '2026-11-14 17:58:15');
 
+-- --------------------------------------------------------
 
+--
+-- Table structure for table `warehouses`
+--
 
 CREATE TABLE `warehouses` (
   `id` int(11) NOT NULL,
@@ -1341,76 +1501,124 @@ CREATE TABLE `warehouses` (
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `warehouses`
+--
 
 INSERT INTO `warehouses` (`id`, `warehouse_code`, `warehouse_name`, `location`, `manager`, `contact_number`, `status`) VALUES
 (1, 'WH-MAIN', 'Main Warehouse', 'Main Storage', 'Andrew Suficiencia', '', 'Active'),
 (2, 'WH-SECONDARY', 'Secondary Warehouse', 'Secondary Storage', 'Meynard Paje', '', 'Active');
 
+--
+-- Indexes for dumped tables
+--
 
+--
+-- Indexes for table `app_migrations`
+--
 ALTER TABLE `app_migrations`
   ADD PRIMARY KEY (`name`);
 
+--
+-- Indexes for table `categories`
+--
 ALTER TABLE `categories`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `category_name` (`category_name`);
 
+--
+-- Indexes for table `deliveries`
+--
 ALTER TABLE `deliveries`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `request_id` (`request_id`);
 
+--
+-- Indexes for table `delivery_receipts`
+--
 ALTER TABLE `delivery_receipts`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `dr_number` (`dr_number`),
   ADD UNIQUE KEY `delivery_id` (`delivery_id`),
   ADD KEY `fk_dr_request` (`request_id`);
 
+--
+-- Indexes for table `finished_goods`
+--
 ALTER TABLE `finished_goods`
   ADD PRIMARY KEY (`fg_id`),
   ADD UNIQUE KEY `item_code` (`item_code`),
   ADD KEY `fk_fg_category` (`category_id`);
 
+--
+-- Indexes for table `inventory`
+--
 ALTER TABLE `inventory`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uq_inventory_item_warehouse` (`item_id`,`warehouse_id`),
   ADD KEY `fk_inventory_warehouse` (`warehouse_id`);
 
+--
+-- Indexes for table `items`
+--
 ALTER TABLE `items`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `item_code` (`item_code`),
   ADD KEY `fk_items_category` (`category_id`);
 
+--
+-- Indexes for table `notifications`
+--
 ALTER TABLE `notifications`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_notifications_created` (`created_at`),
   ADD KEY `fk_notification_actor` (`actor_user_id`),
   ADD KEY `idx_notifications_recipient` (`recipient_user_id`,`created_at`);
 
+--
+-- Indexes for table `notification_reads`
+--
 ALTER TABLE `notification_reads`
   ADD PRIMARY KEY (`notification_id`,`user_id`),
   ADD KEY `fk_notification_read_user` (`user_id`);
 
+--
+-- Indexes for table `raw_materials`
+--
 ALTER TABLE `raw_materials`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `item_code` (`item_code`),
   ADD KEY `fk_raw_category` (`category_id`);
 
+--
+-- Indexes for table `requests`
+--
 ALTER TABLE `requests`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `request_number` (`request_number`),
   ADD KEY `fk_request_user` (`requested_by`),
   ADD KEY `fk_request_approved` (`approved_by`);
 
+--
+-- Indexes for table `request_items`
+--
 ALTER TABLE `request_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_requestitem_request` (`request_id`),
   ADD KEY `fk_requestitem_item` (`item_id`),
   ADD KEY `fk_requestitem_warehouse` (`warehouse_id`);
 
+--
+-- Indexes for table `sales_returns`
+--
 ALTER TABLE `sales_returns`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `return_number` (`return_number`),
   ADD KEY `idx_sales_returns_status` (`status`);
 
+--
+-- Indexes for table `sales_return_items`
+--
 ALTER TABLE `sales_return_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_sales_return_item_return` (`return_id`),
@@ -1418,6 +1626,9 @@ ALTER TABLE `sales_return_items`
   ADD KEY `fk_sales_return_item_warehouse` (`warehouse_id`),
   ADD KEY `idx_sri_sales_return_id` (`sales_return_id`);
 
+--
+-- Indexes for table `stock_adjustments`
+--
 ALTER TABLE `stock_adjustments`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `adjustment_number` (`adjustment_number`),
@@ -1425,6 +1636,9 @@ ALTER TABLE `stock_adjustments`
   ADD KEY `fk_adjustment_warehouse` (`warehouse_id`),
   ADD KEY `fk_adjustment_user` (`user_id`);
 
+--
+-- Indexes for table `stock_in`
+--
 ALTER TABLE `stock_in`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `stock_in_number` (`stock_in_number`),
@@ -1432,12 +1646,18 @@ ALTER TABLE `stock_in`
   ADD KEY `fk_stockin_warehouse` (`warehouse_id`),
   ADD KEY `fk_stockin_user` (`user_id`);
 
+--
+-- Indexes for table `stock_movements`
+--
 ALTER TABLE `stock_movements`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_movement_item` (`item_id`),
   ADD KEY `fk_movement_warehouse` (`warehouse_id`),
   ADD KEY `fk_movement_user` (`user_id`);
 
+--
+-- Indexes for table `stock_out`
+--
 ALTER TABLE `stock_out`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `stock_out_number` (`stock_out_number`),
@@ -1445,6 +1665,9 @@ ALTER TABLE `stock_out`
   ADD KEY `fk_stockout_warehouse` (`warehouse_id`),
   ADD KEY `fk_stockout_user` (`user_id`);
 
+--
+-- Indexes for table `stock_transfers`
+--
 ALTER TABLE `stock_transfers`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `transfer_number` (`transfer_number`),
@@ -1453,11 +1676,17 @@ ALTER TABLE `stock_transfers`
   ADD KEY `fk_transfer_to` (`to_warehouse`),
   ADD KEY `fk_transfer_user` (`user_id`);
 
+--
+-- Indexes for table `stock_transfer_items`
+--
 ALTER TABLE `stock_transfer_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_transfer_items_transfer` (`transfer_id`),
   ADD KEY `fk_transfer_items_item` (`item_id`);
 
+--
+-- Indexes for table `supplier_rejections`
+--
 ALTER TABLE `supplier_rejections`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uq_supplier_rejection_delivery` (`delivery_id`),
@@ -1465,164 +1694,296 @@ ALTER TABLE `supplier_rejections`
   ADD KEY `fk_supplier_rejection_request` (`request_id`),
   ADD KEY `fk_supplier_rejection_user` (`created_by`);
 
+--
+-- Indexes for table `supplier_rejection_items`
+--
 ALTER TABLE `supplier_rejection_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_sri_rejection` (`rejection_id`),
   ADD KEY `fk_sri_request_item` (`request_item_id`);
 
+--
+-- Indexes for table `users`
+--
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `email` (`email`),
   ADD UNIQUE KEY `username` (`username`);
 
+--
+-- Indexes for table `warehouses`
+--
 ALTER TABLE `warehouses`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `warehouse_code` (`warehouse_code`);
 
+--
+-- AUTO_INCREMENT for dumped tables
+--
 
+--
+-- AUTO_INCREMENT for table `categories`
+--
 ALTER TABLE `categories`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
+--
+-- AUTO_INCREMENT for table `deliveries`
+--
 ALTER TABLE `deliveries`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
+--
+-- AUTO_INCREMENT for table `delivery_receipts`
+--
 ALTER TABLE `delivery_receipts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
+--
+-- AUTO_INCREMENT for table `inventory`
+--
 ALTER TABLE `inventory`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=378;
 
+--
+-- AUTO_INCREMENT for table `items`
+--
 ALTER TABLE `items`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=97;
 
+--
+-- AUTO_INCREMENT for table `notifications`
+--
 ALTER TABLE `notifications`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=63;
 
+--
+-- AUTO_INCREMENT for table `requests`
+--
 ALTER TABLE `requests`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
+--
+-- AUTO_INCREMENT for table `request_items`
+--
 ALTER TABLE `request_items`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
+--
+-- AUTO_INCREMENT for table `sales_returns`
+--
 ALTER TABLE `sales_returns`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `sales_return_items`
+--
 ALTER TABLE `sales_return_items`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `stock_adjustments`
+--
 ALTER TABLE `stock_adjustments`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `stock_in`
+--
 ALTER TABLE `stock_in`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
+--
+-- AUTO_INCREMENT for table `stock_movements`
+--
 ALTER TABLE `stock_movements`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=331407;
 
+--
+-- AUTO_INCREMENT for table `stock_out`
+--
 ALTER TABLE `stock_out`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
+--
+-- AUTO_INCREMENT for table `stock_transfers`
+--
 ALTER TABLE `stock_transfers`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `stock_transfer_items`
+--
 ALTER TABLE `stock_transfer_items`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `supplier_rejections`
+--
 ALTER TABLE `supplier_rejections`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `supplier_rejection_items`
+--
 ALTER TABLE `supplier_rejection_items`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `users`
+--
 ALTER TABLE `users`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
+--
+-- AUTO_INCREMENT for table `warehouses`
+--
 ALTER TABLE `warehouses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
+--
+-- Constraints for dumped tables
+--
 
+--
+-- Constraints for table `deliveries`
+--
 ALTER TABLE `deliveries`
   ADD CONSTRAINT `fk_delivery_request` FOREIGN KEY (`request_id`) REFERENCES `requests` (`id`) ON DELETE CASCADE;
 
+--
+-- Constraints for table `delivery_receipts`
+--
 ALTER TABLE `delivery_receipts`
   ADD CONSTRAINT `fk_dr_delivery` FOREIGN KEY (`delivery_id`) REFERENCES `deliveries` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_dr_request` FOREIGN KEY (`request_id`) REFERENCES `requests` (`id`) ON DELETE CASCADE;
 
+--
+-- Constraints for table `finished_goods`
+--
 ALTER TABLE `finished_goods`
   ADD CONSTRAINT `fk_fg_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`);
 
+--
+-- Constraints for table `inventory`
+--
 ALTER TABLE `inventory`
   ADD CONSTRAINT `fk_inventory_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_inventory_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
 
+--
+-- Constraints for table `items`
+--
 ALTER TABLE `items`
   ADD CONSTRAINT `fk_items_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`);
 
+--
+-- Constraints for table `notifications`
+--
 ALTER TABLE `notifications`
   ADD CONSTRAINT `fk_notification_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
+--
+-- Constraints for table `notification_reads`
+--
 ALTER TABLE `notification_reads`
   ADD CONSTRAINT `fk_notification_read_notification` FOREIGN KEY (`notification_id`) REFERENCES `notifications` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_notification_read_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
+--
+-- Constraints for table `raw_materials`
+--
 ALTER TABLE `raw_materials`
   ADD CONSTRAINT `fk_raw_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`);
 
+--
+-- Constraints for table `requests`
+--
 ALTER TABLE `requests`
   ADD CONSTRAINT `fk_request_approved` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_request_user` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
+--
+-- Constraints for table `request_items`
+--
 ALTER TABLE `request_items`
   ADD CONSTRAINT `fk_requestitem_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_requestitem_request` FOREIGN KEY (`request_id`) REFERENCES `requests` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_requestitem_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
 
+--
+-- Constraints for table `sales_return_items`
+--
 ALTER TABLE `sales_return_items`
   ADD CONSTRAINT `fk_sales_return_item_header` FOREIGN KEY (`sales_return_id`) REFERENCES `sales_returns` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_sales_return_item_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_sales_return_item_return` FOREIGN KEY (`return_id`) REFERENCES `sales_returns` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_sales_return_item_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
 
+--
+-- Constraints for table `stock_adjustments`
+--
 ALTER TABLE `stock_adjustments`
   ADD CONSTRAINT `fk_adjustment_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_adjustment_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_adjustment_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
 
+--
+-- Constraints for table `stock_in`
+--
 ALTER TABLE `stock_in`
   ADD CONSTRAINT `fk_stockin_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_stockin_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_stockin_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
 
+--
+-- Constraints for table `stock_movements`
+--
 ALTER TABLE `stock_movements`
   ADD CONSTRAINT `fk_movement_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_movement_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_movement_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
 
+--
+-- Constraints for table `stock_out`
+--
 ALTER TABLE `stock_out`
   ADD CONSTRAINT `fk_stockout_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_stockout_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_stockout_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses` (`id`);
 
+--
+-- Constraints for table `stock_transfers`
+--
 ALTER TABLE `stock_transfers`
   ADD CONSTRAINT `fk_transfer_from` FOREIGN KEY (`from_warehouse`) REFERENCES `warehouses` (`id`),
   ADD CONSTRAINT `fk_transfer_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_transfer_to` FOREIGN KEY (`to_warehouse`) REFERENCES `warehouses` (`id`),
   ADD CONSTRAINT `fk_transfer_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
+--
+-- Constraints for table `stock_transfer_items`
+--
 ALTER TABLE `stock_transfer_items`
   ADD CONSTRAINT `fk_transfer_items_item` FOREIGN KEY (`item_id`) REFERENCES `items` (`id`),
   ADD CONSTRAINT `fk_transfer_items_transfer` FOREIGN KEY (`transfer_id`) REFERENCES `stock_transfers` (`id`) ON DELETE CASCADE;
 
+--
+-- Constraints for table `supplier_rejections`
+--
 ALTER TABLE `supplier_rejections`
   ADD CONSTRAINT `fk_supplier_rejection_delivery` FOREIGN KEY (`delivery_id`) REFERENCES `deliveries` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_supplier_rejection_request` FOREIGN KEY (`request_id`) REFERENCES `requests` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_supplier_rejection_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
+--
+-- Constraints for table `supplier_rejection_items`
+--
 ALTER TABLE `supplier_rejection_items`
   ADD CONSTRAINT `fk_sri_rejection` FOREIGN KEY (`rejection_id`) REFERENCES `supplier_rejections` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_sri_request_item` FOREIGN KEY (`request_item_id`) REFERENCES `request_items` (`id`) ON DELETE SET NULL;
 COMMIT;
 
-;
-;
-;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

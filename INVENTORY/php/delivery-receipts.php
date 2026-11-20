@@ -10,6 +10,7 @@ function refresh_delivery_receipt_status($pdo, $deliveryId)
     $q->execute([(int)$deliveryId]);
     $d = $q->fetch();
     if (!$d) return null;
+    // A non-Inventory request is Delivered only after the receiving team has accepted it.
     if (strtolower(trim((string)($d["requester_team"] ?? ""))) !== "inventory") {
         if (!empty($d["received_date"]) || $d["status"] === "Delivered") return $d;
     }
@@ -23,6 +24,7 @@ function refresh_delivery_receipt_status($pdo, $deliveryId)
     $anyDelivered = false;
     foreach ($items as $it) {
         $target = $inventoryRequest ? (int)$it["quantity"] : (int)$it["approved_quantity"];
+        // Partial status is determined by the physical quantity delivered, not accepted.
         $done = (int)$it["delivered_quantity"];
         if ((int)$it["delivered_quantity"] > 0) $anyDelivered = true;
         if ($done < $target) $allDone = false;
@@ -89,6 +91,8 @@ if ($action === "list") {
     $rows = $s->fetchAll();
 
     foreach ($rows as &$row) {
+        // Backfill older Production requests: earlier Inventory builds discarded
+        // po_number on API intake, but Production kept its PO-xxxx in the remarks.
         if (empty($row["po_number"]) && strcasecmp(trim((string)($row["requester_team"] ?? "")), "Production") === 0) {
             if (preg_match('/\b(PO-[A-Z0-9-]+)\b/i', (string)($row["request_remarks"] ?? ""), $poMatch)) {
                 $recoveredPo = strtoupper($poMatch[1]);

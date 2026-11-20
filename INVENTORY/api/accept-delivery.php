@@ -72,6 +72,7 @@ try {
          WHERE id = ?"
     )->execute([$deliveryId]);
 
+    // The Delivery Receipt is created only after the requesting team accepts the shipment.
     $receiptCheck = $pdo->prepare("SELECT id FROM delivery_receipts WHERE delivery_id = ? LIMIT 1");
     $receiptCheck->execute([$deliveryId]);
     if (!$receiptCheck->fetchColumn()) {

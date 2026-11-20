@@ -2,6 +2,7 @@
 require_once "_bootstrap.php";
 api_method(["POST"]);
 
+// This endpoint accepts workflow events only from the Procurement system.
 $providedKey = $_SERVER["HTTP_X_API_KEY"] ?? "";
 $expectedKey = getenv("IMS_API_KEY") ?: ($_SERVER["IMS_API_KEY"] ?? "");
 $sourceTeam = trim($_SERVER["HTTP_X_API_TEAM"] ?? "");

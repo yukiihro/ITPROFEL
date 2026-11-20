@@ -1,6 +1,5 @@
 <?php
 require_once "database.php";
-try { $pdo->exec("ALTER TABLE supplier_rejection_items ADD COLUMN item_action VARCHAR(30) NOT NULL DEFAULT 'Inspection Reject'"); } catch (Throwable $e) {}
 require_login();
 require_admin();
 
@@ -87,7 +86,6 @@ if ($action === "list") {
             LEFT JOIN deliveries d ON d.id = sr.delivery_id
             LEFT JOIN delivery_receipts dr ON dr.delivery_id = d.id
             LEFT JOIN supplier_rejection_items sri ON sri.rejection_id = sr.id
-            WHERE sr.email_sent_at IS NULL
             GROUP BY sr.id
             ORDER BY sr.id DESC";
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
@@ -129,20 +127,15 @@ if ($action === "details") {
 
 if ($action === "email_sent") {
     $id = (int)post_value("id");
-    $check = $pdo->prepare("SELECT id, supplier_gmail, email_sent_at FROM supplier_rejections WHERE id=? LIMIT 1");
+    $check = $pdo->prepare("SELECT id, supplier_gmail FROM supplier_rejections WHERE id=? LIMIT 1");
     $check->execute([$id]);
     $row = $check->fetch(PDO::FETCH_ASSOC);
     if (!$row) json_response(["success" => false, "message" => "Rejection report not found."], 404);
-    $email = trim((string)post_value("supplier_gmail", ""));
-    if ($email === "" || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        json_response(["success" => false, "message" => "Enter a valid recipient email address."], 422);
-    }
-    if (!empty($row["email_sent_at"])) {
-        json_response(["success" => false, "message" => "This rejection report was already marked as emailed."], 409);
-    }
-    $pdo->prepare("UPDATE supplier_rejections SET supplier_gmail=?, report_status='Email Sent', email_sent_at=NOW() WHERE id=? AND email_sent_at IS NULL")
+    $email = trim((string)post_value("supplier_gmail", $row["supplier_gmail"]));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_response(["success" => false, "message" => "Enter a valid recipient email address."], 422);
+    $pdo->prepare("UPDATE supplier_rejections SET supplier_gmail=?, report_status='Email Sent', email_sent_at=NOW() WHERE id=?")
         ->execute([$email, $id]);
-    json_response(["success" => true, "message" => "Email marked as sent. The report and its rejected items were removed from the active lists."]);
+    json_response(["success" => true, "message" => "Email status updated. The report is marked as Email Sent."]);
 }
 
 if ($action === "supplier_response") {

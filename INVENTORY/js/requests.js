@@ -134,6 +134,9 @@ var RequestPage = {
           return Number(a.id) - Number(b.id);
         });
 
+      // Finished Goods are selected by model here; the size is selected in
+      // the separate Size field. Collapse the size-specific Item Master rows
+      // so a model appears only once in this dropdown.
       if (expected !== "finished good") return source;
       var seenNames = Object.create(null);
       return source.filter(function (item) {
@@ -782,7 +785,10 @@ var RequestPage = {
         b.classList.toggle("active", b.dataset.view === view);
       });
       var addBtn = document.getElementById("addRequestBtn");
-      if (addBtn) addBtn.hidden = !(view === "inventory" && canControl);
+      if (addBtn) {
+        addBtn.hidden = !(view === "inventory" && canControl);
+        addBtn.style.display = addBtn.hidden ? "none" : "";
+      }
       var search = document.getElementById("requestSearch");
       if (search) search.placeholder = view === "returns" ? "Search Sales Return" : "Search request";
       renderDestinationFilters();
@@ -796,6 +802,7 @@ var RequestPage = {
       var addBtn = document.getElementById("addRequestBtn");
       if (addBtn) {
         addBtn.hidden = true;
+        addBtn.style.display = "none";
         addBtn.disabled = false;
         addBtn.onclick = function (e) {
           e.preventDefault();

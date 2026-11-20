@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Delivery Progress - Inventory Management System</title>
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/style.css?v=3" />
   </head>
   <body class="app" data-page="delivery-progress">
     <aside class="sidebar" id="sidebar">
@@ -60,8 +60,8 @@
             class="admin-only"
             href="rejected-items.html"
             data-page="rejected-items"
-            >Rejected Items</a>
-          <a class="admin-only" href="rejected-return-items.html" data-page="rejected-return-items">Rejected/Return Items</a>
+            >Rejected Items</a
+          >
         </div>
         <div class="side-label">SETTINGS</div>
         <a class="nav-link" href="#" id="logoutBtn"><span>↪</span>Logout</a>
@@ -130,38 +130,6 @@
             </div>
           </div>
         </div>
-        <div class="modal" id="rejectReturnModal">
-          <div class="modal-box">
-            <div class="modal-head">
-              <h3>Reject Raw Materials</h3>
-              <button type="button" class="modal-close">×</button>
-            </div>
-            <div id="rejectReturnDetails"></div>
-            <form id="rejectReturnForm">
-              <div class="form-grid">
-                <label>Item
-                  <select id="rejectReturnItem" required></select>
-                </label>
-                <label>Delivered Items
-                  <input id="rejectReturnDelivered" type="number" readonly />
-                </label>
-                <label>Accepted Items
-                  <input id="rejectReturnAccepted" type="number" min="0" step="1" required />
-                </label>
-                <label>Rejected Items
-                  <input id="rejectReturnQuantity" type="number" min="1" step="1" required />
-                </label>
-                <label class="full-col">Reason
-                  <textarea id="rejectReturnReason" required></textarea>
-                </label>
-              </div>
-              <div class="modal-actions">
-                <button type="button" class="btn outline modal-close">Cancel</button>
-                <button type="submit" class="btn primary">Save Rejected Item</button>
-              </div>
-            </form>
-          </div>
-        </div>
         <div class="modal" id="drDetailsModal">
           <div class="modal-box">
             <div class="modal-head">
@@ -179,8 +147,8 @@
       </main>
     </div>
     <div id="toast" class="toast"></div>
-    <script src="js/inventory.js"></script>
+    <script src="js/inventory.js?v=5"></script>
     <script src="js/pagination.js"></script>
-    <script src="js/deliveries.js?v=20261120-raw-material-reject-v3"></script>
+    <script src="js/deliveries.js?v=20261117-prefill"></script>
   </body>
 </html>

@@ -31,6 +31,9 @@ var DeliveryPage = {
           return a.indexOf(v) === i;
         })
         .join(", ");
+      // v11: Supplier on a linked Procurement PO must come from the approved PO, not Item Master.
+      var procurementLinkedV11 = !!x.is_inventory_request &&
+        String(x.destination || "").trim().toLowerCase() === "procurement";
       body.innerHTML =
         '<div class="form-grid"><label>Request Number<input readonly value="' +
         InventoryApp.esc(x.request_number || "") +
@@ -39,7 +42,7 @@ var DeliveryPage = {
         '"></label><label>Requested By<input readonly value="' +
         InventoryApp.esc(x.requester || "") +
         '"></label><label>Status<input readonly value="' +
-        InventoryApp.esc(x.status === "Out for Delivery" ? "To Delivered" : (x.status === "Delivered" ? "Accepted Item" : (x.status || ""))) +
+        InventoryApp.esc(x.status || "") +
         '"></label>' +
         (String(x.destination || "").toLowerCase() === "procurement"
           ? '<label>PO Number<input readonly value="' +
@@ -54,13 +57,15 @@ var DeliveryPage = {
             var target = x.is_inventory_request
               ? Number(it.quantity || 0)
               : Number(it.approved_quantity || 0);
-            var toDeliver = Number(it.delivered_quantity || 0);
+            // Pre-fill with the full approved quantity so "Confirm Delivery"
+            // ships everything by default. A delivery that was already
+            // recorded keeps its saved quantity for correction.
+            var toDeliver = Number(it.delivered_quantity || 0) || target;
             var rejected = Number(it.inspection_rejected_quantity || 0);
-            // If this delivery has not been inspected yet, default all delivered
-            // units to Accepted. Staff can still change the split and mark rejects.
-            var isReceipt = !!x.is_inventory_request;
-            var accepted = Number(it.inspection_accepted_quantity || 0);
-            if (accepted === 0 && rejected === 0 && toDeliver > 0) accepted = toDeliver;
+            var accepted = Math.max(
+              0,
+              toDeliver - rejected,
+            );
             return (
               '<div class="delivery-item-editor inspection-item" data-ri="' +
               it.id +
@@ -72,23 +77,19 @@ var DeliveryPage = {
               InventoryApp.qty(target) +
               " " +
               InventoryApp.esc(it.unit || "") +
-              '</small></div><label><small>' + (isReceipt ? 'Delivered Items' : 'To Delivered') + '</small><input type="number" min="0" max="' +
-            target +
-            '" step="1" value="' +
-            toDeliver +
-            '" data-ri="' +
-            it.id +
-            '" class="to-deliver-qty"></label>' +
-            (isReceipt
-              ? '<label><small>Rejected Items</small><input type="number" min="0" max="' +
-                target +
-                '" step="1" value="' +
-                rejected +
-                '" class="inspection-rejected"></label><label class="reason-field"><small>Rejection Reason</small><input class="inspection-reason" value="' +
-                InventoryApp.esc(it.inspection_rejection_reason || "") +
-                '" placeholder="Reason (required if rejected)"></label>'
-              : '') +
-            '</div>'
+              '</small></div><label><small>Total Delivered</small><input type="number" min="0" max="' +
+              target +
+              '" step="1" value="' +
+              toDeliver +
+              '" data-ri="' +
+              it.id +
+              '" class="to-deliver-qty"></label><label><small>Rejected</small><input type="number" min="0" max="' +
+              target +
+              '" step="1" value="' +
+              rejected +
+              '" class="inspection-rejected"></label><label class="reason-field"><small>Rejection Reason</small><input class="inspection-reason" value="' +
+              InventoryApp.esc(it.inspection_rejection_reason || "") +
+              '" placeholder="Reason (required if rejected)"></label></div>'
             );
           })
           .join("") +
@@ -97,13 +98,17 @@ var DeliveryPage = {
         var toDeliver = row.querySelector(".to-deliver-qty"),
           rejected = row.querySelector(".inspection-rejected");
         function sync() {
-          var d = Math.max(0, Number(toDeliver.value || 0));
-          if (rejected) rejected.max = d;
+          var d = Math.max(0, Number(toDeliver.value || 0)),
+            r = Math.max(0, Number(rejected.value || 0));
+          rejected.max = d;
+          if (r > d) rejected.value = d;
         }
         toDeliver.addEventListener("input", sync);
-        if (rejected) rejected.addEventListener("input", sync);
-        sync();
+        rejected.addEventListener("input", sync);
       });
+      // Inventory can confirm receipt only after the shipment is Out for Delivery.
+      // Saving this form records To Deliver and Rejected quantities; Accepted is calculated automatically and
+      // is the only action that finalizes an Inventory-originated delivery.
       var canEdit = canControl && (
         x.is_inventory_request
           ? x.status === "Out for Delivery"
@@ -115,16 +120,37 @@ var DeliveryPage = {
       document.getElementById("saveDeliveryBtn").textContent = x.is_inventory_request
         ? "Confirm Receipt"
         : "Confirm Delivery";
+      if (procurementLinkedV11 && canEdit) {
+        var supplierFieldV11 = document.getElementById("inspectionSupplier");
+        var saveButtonV11 = document.getElementById("saveDeliveryBtn");
+        supplierFieldV11.readOnly = true;
+        supplierFieldV11.value = "Verifying approved PO supplier...";
+        saveButtonV11.disabled = true;
+        InventoryApp.request("php/deliveries.php", {
+          action: "po_supplier",
+          po_number: x.po_number || "",
+          request_number: x.request_number || ""
+        }, "GET", function (result) {
+          if (result && result.success && result.supplier_name) {
+            supplierFieldV11.value = result.supplier_name;
+            saveButtonV11.disabled = false;
+          } else {
+            supplierFieldV11.value = "Supplier verification unavailable";
+            saveButtonV11.disabled = true;
+            InventoryApp.toast((result && result.message) || "Cannot verify approved PO supplier. Receipt not saved.");
+          }
+        });
+      } else {
+        document.getElementById("saveDeliveryBtn").disabled = false;
+      }
       document.getElementById("saveDeliveryBtn").onclick = function () {
         var items = [];
         var valid = true;
         body.querySelectorAll(".inspection-item").forEach(function (row) {
           var d = Number(row.querySelector(".to-deliver-qty").value || 0),
-            rejectedInput = row.querySelector(".inspection-rejected"),
-            reasonInput = row.querySelector(".inspection-reason"),
-            r = rejectedInput ? Number(rejectedInput.value || 0) : 0,
+            r = Number(row.querySelector(".inspection-rejected").value || 0),
             a = d - r,
-            reason = reasonInput ? reasonInput.value.trim() : "";
+            reason = row.querySelector(".inspection-reason").value.trim();
           if (
             !Number.isInteger(d) ||
             !Number.isInteger(a) ||
@@ -143,7 +169,7 @@ var DeliveryPage = {
         });
         if (!valid) {
           InventoryApp.toast(
-            "Delivered quantity must equal Accepted + Rejected. Add a reason for every rejected item.",
+            "Rejected quantity cannot exceed To Deliver. Add a reason for every rejected item.",
           );
           return;
         }
@@ -179,13 +205,11 @@ var DeliveryPage = {
       document.getElementById("deliveryTable").innerHTML =
         data
           .map(function (x) {
-            var status = x.status === "Out for Delivery" ? "To Delivered" : (x.status === "Delivered" ? "Accepted Item" : x.status),
+            var status = x.status,
               statusClass =
                 status === "Accepted" ||
-                status === "Accepted Item" ||
                 status === "Delivered" ||
-                status === "Out for Delivery" ||
-                status === "Deliver Items"
+                status === "Out for Delivery"
                   ? "active"
                   : status === "Partially Delivered"
                     ? "partial"
@@ -194,16 +218,7 @@ var DeliveryPage = {
                       : "low";
             var action = "";
             if (canControl && !!x.is_inventory_request) {
-              if (x.status === "Delivered") {
-                var hasPendingRawMaterial = (x.items || []).some(function (item) {
-                  return String(item.item_type || "").toLowerCase() === "raw material" &&
-                    Number(item.delivered_quantity || 0) > 0 &&
-                    Number(item.rejected_action_quantity || 0) === 0;
-                });
-                if (hasPendingRawMaterial) {
-                  action = '<button class="action-btn primary-action" data-reject-return="' + x.id + '">Reject</button>';
-                }
-              } else if (x.status === "Out for Delivery" && !x.dr_id) {
+              if (x.status === "Out for Delivery" && !x.dr_id) {
                 action = '<button class="action-btn" data-record="' + x.id + '">Confirm Receipt</button>';
               } else if (x.status === "Delivered" || x.dr_id) {
                 action = '<button class="action-btn" type="button" disabled title="Receipt has already been confirmed">Confirm Receipt</button>';
@@ -272,84 +287,6 @@ var DeliveryPage = {
       if (!b) return;
       if (b.dataset.record) {
         openRecord(b.dataset.record);
-        return;
-      }
-      var rejectReturnId = b.dataset.rejectReturn;
-      if (rejectReturnId) {
-        var delivery = rows.find(function (r) {
-          return String(r.id) === String(rejectReturnId);
-        });
-        if (!delivery || !delivery.items || !delivery.items.length) return;
-        var itemSelect = document.getElementById("rejectReturnItem");
-        var eligibleRawMaterials = delivery.items.filter(function (item) {
-          return String(item.item_type || "").toLowerCase() === "raw material" &&
-            Number(item.delivered_quantity || 0) > 0 &&
-            Number(item.rejected_action_quantity || 0) === 0;
-        });
-        if (!eligibleRawMaterials.length) return;
-        itemSelect.innerHTML = eligibleRawMaterials.map(function (item) {
-          return '<option value="' + Number(item.id) + '">' +
-            InventoryApp.esc(item.item_name || "") +
-            '</option>';
-        }).join("");
-        document.getElementById("rejectReturnDetails").innerHTML =
-          '<div class="form-grid"><label>Request Number<input readonly value="' +
-          InventoryApp.esc(delivery.request_number || "") +
-          '"></label><label>P.O. Number<input readonly value="' +
-          InventoryApp.esc(delivery.po_number || "Not assigned yet") +
-          '"></label><label>Delivery Receipt Number<input readonly value="' +
-          InventoryApp.esc(delivery.dr_number || "Not available") +
-          '"></label><label>Delivered Date<input readonly value="' +
-          InventoryApp.esc(delivery.delivered_date || "") +
-          '"></label></div>';
-        function updateRejectReturnItem() {
-          var selected = delivery.items.find(function (item) {
-            return String(item.id) === String(itemSelect.value);
-          });
-          if (!selected) return;
-          var delivered = Number(selected.delivered_quantity || 0);
-          var accepted = Number(selected.inspection_accepted_quantity || 0);
-          document.getElementById("rejectReturnDelivered").value = delivered;
-          document.getElementById("rejectReturnAccepted").value = accepted;
-          document.getElementById("rejectReturnAccepted").max = delivered;
-          document.getElementById("rejectReturnQuantity").value = "";
-        }
-        itemSelect.onchange = updateRejectReturnItem;
-        updateRejectReturnItem();
-        document.getElementById("rejectReturnReason").value = "";
-        document.getElementById("rejectReturnForm").onsubmit = function (event) {
-          event.preventDefault();
-          var selectedItemId = Number(itemSelect.value);
-          var amount = Number(document.getElementById("rejectReturnQuantity").value);
-          var acceptedCount = Number(document.getElementById("rejectReturnAccepted").value);
-          var deliveredCount = Number(document.getElementById("rejectReturnDelivered").value);
-          var reason = document.getElementById("rejectReturnReason").value.trim();
-          var selectedItem = delivery.items.find(function (item) {
-            return Number(item.id) === selectedItemId;
-          });
-          if (!selectedItem || !Number.isInteger(acceptedCount) || acceptedCount < 0 ||
-              acceptedCount > deliveredCount || !Number.isInteger(amount) || amount < 1 ||
-              amount > (deliveredCount - acceptedCount) || !reason) {
-            InventoryApp.toast("Enter an accepted quantity not greater than delivered, a rejected quantity within the remaining delivered units, and a reason.");
-            return;
-          }
-          InventoryApp.request("php/deliveries.php", {
-            action: "reject_return",
-            id: rejectReturnId,
-            request_item_id: selectedItemId,
-            item_action: "Reject",
-            quantity: amount,
-            accepted_quantity: acceptedCount,
-            reason: reason
-          }, "POST", function (r) {
-            InventoryApp.toast(r.message || "Unable to save.");
-            if (r.success) {
-              InventoryApp.closeModal(document.getElementById("rejectReturnModal"));
-              load();
-            }
-          });
-        };
-        InventoryApp.openModal("rejectReturnModal");
         return;
       }
       var remainingDeliveryId = b.dataset.sendRemainingDelivery;

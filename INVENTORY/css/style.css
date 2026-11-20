@@ -100,10 +100,15 @@ button {
 .nav-link b {
   margin-left: auto;
 }
-.nav-link:hover,
-.nav-link.active {
+.nav-link:hover {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
+}
+/* Current page gets its own unmistakable marker (white pill + brand red
+   text) so a hovered item is never confused with the active one. */
+.nav-link.active {
+  background: #fff;
+  color: #8a0011;
 }
 .submenu {
   display: none;
@@ -119,10 +124,14 @@ button {
   border-radius: 7px;
   font-size: 12px;
 }
-.submenu a:hover,
-.submenu a.active {
+.submenu a:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
+}
+.submenu a.active {
+  background: #fff;
+  color: #8a0011;
+  font-weight: 700;
 }
 .side-label {
   font-size: 10px;
@@ -207,6 +216,9 @@ button {
   border: 0;
   background: transparent;
   font-size: 22px;
+}
+.sidebar-backdrop {
+  display: none;
 }
 
 .content {
@@ -774,7 +786,7 @@ tbody tr:last-child td {
   outline-offset: 2px;
 }
 
-
+/* Clean top-right: only the notification bell and current user label. */
 .admin-only {
 }
 .notification-wrap {
@@ -944,6 +956,15 @@ body[data-role="USER"] .admin-action-col {
   .mobile-menu {
     display: block;
   }
+  /* Scrim behind the off-canvas sidebar so it can always be closed
+     (the open sidebar used to cover the hamburger button). */
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(23, 26, 33, 0.45);
+    z-index: 19;
+  }
   .topbar {
     padding: 0 15px;
   }
@@ -1069,7 +1090,7 @@ body[data-role="USER"] .admin-action-col {
   }
 }
 
-
+/* ===== RESPONSIVE LAYOUT ===== */
 html {
   width: 100%;
   overflow-x: hidden;
@@ -1124,26 +1145,13 @@ body {
   }
 }
 @media (max-width: 900px) {
-  .sidebar {
-    width: 260px;
-    transform: translateX(-100%);
-    display: block;
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  .main-area {
-    margin-left: 0;
-    width: 100%;
-  }
+  /* Sidebar stays persistent (desktop layout) from 761px up. The
+     off-canvas + hamburger behavior belongs to the ≤760px block only,
+     so mid-size laptop windows no longer lose the menu on navigation. */
   .topbar {
     height: 62px;
     padding: 0 16px;
     gap: 10px;
-  }
-  .mobile-menu {
-    display: block;
-    flex: 0 0 auto;
   }
   .content {
     padding: 20px;
@@ -1263,7 +1271,7 @@ body {
     font-size: 11px;
   }
 }
-
+/* Prevent sidebar/page flicker without changing the system's colors. */
 *,
 *::before,
 *::after {
@@ -1337,7 +1345,7 @@ body {
   }
 }
 
-
+/* Request Sheet: clean grouped request cards */
 .request-list {
   display: grid;
   gap: 14px;
@@ -1519,7 +1527,7 @@ body {
   }
 }
 
-
+/* Stock Transfer - multi-item warehouse-to-warehouse form */
 .transfer-modal-box {
   max-width: 980px;
   width: 94vw;
@@ -1650,7 +1658,7 @@ body {
   }
 }
 
-
+/* Stock Transfer reliability/layout */
 .transfer-item-row {
   display: grid;
   grid-template-columns: 180px minmax(260px, 1fr) 150px 38px;
@@ -1749,7 +1757,7 @@ body {
   }
 }
 
-
+/* Stock Transfer - final clean form layout */
 .transfer-modal-box {
   width: min(920px, 96vw);
   padding: 24px;
@@ -2214,7 +2222,7 @@ body {
   border-color: #7d0010;
 }
 
-
+/* Request Sheet rejected-items layout and clean profile header */
 .rejected-heading {
   display: flex;
   align-items: center;
@@ -2277,7 +2285,7 @@ body {
 .notification-wrap {
   margin-right: 6px;
 }
-
+/* Request Sheet: status sections open only when their header is clicked */
 .request-columns.status-open {
   grid-template-columns: 1fr;
 }
@@ -2319,7 +2327,7 @@ body {
   cursor: not-allowed;
 }
 
-
+/* Request Sheet status filtering and compact rejected items */
 .request-columns.status-closed .request-column-body {
   display: none !important;
 }
@@ -2378,7 +2386,7 @@ body {
   padding: 12px 4px 2px;
 }
 
-
+/* Rejected Items page styles migrated from the source project. */
 .rejection-heading {
   display: flex;
   align-items: center;
@@ -2776,7 +2784,7 @@ body {
   }
 }
 
-
+/* Rejection Report: match the supplied two-column reference dashboard. */
 .rejection-page {
   padding: 24px 24px 32px;
   max-width: none;
@@ -3040,7 +3048,7 @@ body {
   }
 }
 
-
+/* Rejection Report final layout polish: match the supplied desktop reference. */
 body.app .content.rejection-page {
   padding: 24px 24px 32px !important;
   max-width: none !important;
@@ -3519,7 +3527,7 @@ body.app .rejection-page .rejection-toolbar .refresh-quiet {
   display: none !important;
 }
 
-
+/* Final Rejection Report layout overrides (scoped to this page only). */
 body.app .content.rejection-page {
   padding: 24px 28px 32px !important;
   max-width: none !important;
@@ -3888,7 +3896,7 @@ body.app .rejection-page .rejection-department {
   }
 }
 
-
+/* Final readability fix: keep delivery labels and values on normal horizontal lines. */
 body.app .rejection-page .delivery-meta-grid {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
@@ -3956,7 +3964,7 @@ body.app .rejection-page .rejection-communication {
   }
 }
 
-
+/* V3 hard override: prevent the Requested By value from collapsing to a one-character column. */
 body.app .rejection-page .delivery-meta-grid {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
@@ -4003,7 +4011,7 @@ body.app .rejection-page .delivery-meta-pair > span {
   }
 }
 
-
+/* Rejection report delivery metadata: stable label/value layout on screen and print. */
 body.app .rejection-page .rejection-detail-body .rejection-detail-main {
   min-width: 0 !important;
   width: 100% !important;
@@ -4057,7 +4065,7 @@ body.app .rejection-page .delivery-meta-pair span {
   }
 }
 
-
+/* FINAL FIX: rejection delivery metadata must never collapse values into vertical letters. */
 html
   body.app
   .content.rejection-page
@@ -4144,7 +4152,7 @@ html
   }
 }
 
-
+/* Rejection report attachment uploader */
 .rejection-attachments .attachment-upload-row {
   display: flex;
   flex-wrap: wrap;
@@ -4184,13 +4192,13 @@ html
   background: #f8e9eb;
 }
 
-
+/* The approval-rejected-items view is intentionally removed from Request Sheet. */
 #requestTabs [data-view="rejected"],
 #rejectedPanel {
   display: none !important;
 }
 
-
+/* Request Sheet: Size dropdown beside the item, disabled Select Item state */
 #requestModal .request-item-editor {
   grid-template-columns: minmax(240px, 1fr) 110px 100px 90px 42px;
 }
@@ -4201,7 +4209,7 @@ html
 }
 
 
-
+/* Sales Return tab in Request Sheet */
 .return-tab-count { display:inline-flex; min-width:20px; height:20px; padding:0 5px; margin-left:5px; align-items:center; justify-content:center; border-radius:20px; background:rgba(255,255,255,.22); font-size:11px; }
 .return-card-items { display:grid; gap:12px; padding:14px 16px; }
 .return-line { display:grid; grid-template-columns:minmax(180px,1fr) 90px 110px minmax(180px,1.2fr) 150px; gap:12px; align-items:start; border-bottom:1px solid #f0e9eb; padding-bottom:12px; }

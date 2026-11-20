@@ -259,7 +259,7 @@
             .join("")
         : '<tr><td colspan="4" class="empty">No transfer records found.</td></tr>';
       document.querySelectorAll(".admin-only").forEach(function (el) {
-        el.style.display = document.body.dataset.role === "ADMIN" ? "" : "";
+        el.style.display = document.body.dataset.role === "ADMIN" ? "" : "none";
       });
     }
     function openNew() {
@@ -278,6 +278,7 @@
         InventoryApp.openModal("transferModal");
       }
     }
+    // Bind immediately so the button remains functional even if an API request fails.
     add.addEventListener("click", function (e) {
       e.preventDefault();
       e.stopPropagation();

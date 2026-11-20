@@ -1,0 +1,34 @@
+Baguhin nyo yung directory path name depende sa path ng htdocs nyo
+
+
+==API CONNECTION TO OPENROUTE and PAYMENT GATEWAY ALSO INVENTORY==
+
+<Directory "C:/xampp/htdocs/Customer-System">
+    SetEnv INVENTORY_API_BASE_URL "http://localhost/ITPROFEL/INVENTORY/api"
+    SetEnv INVENTORY_API_KEY "2e0a029342ae30237f4324524b62ef073dab624b636b9e896229195869fd069d"
+    SetEnv OPENROUTESERVICE_API_KEY "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImQ3NmE2ODllZTg0NjQxODI5Y2I4NDA0ZmNhNGIyMGVjIiwiaCI6Im11cm11cjY0In0="
+    SetEnv PAYMENT_GATEWAY_BASE_URL "http://localhost/payment-gateway/public/api/v1"
+    SetEnv PAYMENT_GATEWAY_API_KEY "pg_test_62bb302c7eb1819e6fde47cba148d57b70e02f1e42d008745e695547eb3a08e4"
+</Directory>
+
+==API CONNECTION TO INVENTORY==
+
+<Directory "C:/xampp/htdocs/ITPROFEL/SALES">
+    SetEnv INVENTORY_API_BASE_URL "http://localhost/ITPROFEL/INVENTORY/api"
+    SetEnv INVENTORY_API_KEY "2e0a029342ae30237f4324524b62ef073dab624b636b9e896229195869fd069d"
+    SetEnv PAYMENT_WEBHOOK_SECRET "3ef08fa6eca12cdc68f64d5ac3cef6d6c12f10584234648c8a8ee8f43205ef70"
+</Directory>
+
+==API OF INVENTORY==
+
+<Directory "C:/xampp/htdocs/ITPROFEL/INVENTORY/api">
+    SetEnv IMS_API_KEY "2e0a029342ae30237f4324524b62ef073dab624b636b9e896229195869fd069d"
+</Directory>
+
+==PAYMENT GATEWAY API==
+
+<Directory "C:/xampp/htdocs/Payment-Gateway">
+    SetEnv PAYMENT_GATEWAY_CHECKOUT_URL "http://localhost/payment-gateway/public/checkout/index.php"
+    SetEnv PAYMENT_GATEWAY_RETURN_URL "http://localhost/Customer-System/payment.php"
+    SetEnv PAYMENT_GATEWAY_CLIENT_REGISTRATION_SECRET "8bff621ddfc3b9adcaa182175ce15cd8c66f60e200c0def1a69c05aaa78dd0d3"
+</Directory>

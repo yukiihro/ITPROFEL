@@ -26,9 +26,9 @@ function getSalesDB(): PDO
     return $pdo;
 }
 
-function reconcileSalesToFinance(int $salesInvoiceId): int
+function reconcileSalesToFinance(?int $salesInvoiceId = null): int
 {
-    if ($salesInvoiceId <= 0) {
+    if ($salesInvoiceId !== null && $salesInvoiceId <= 0) {
         throw new InvalidArgumentException('A valid Sales invoice ID is required.');
     }
 
@@ -39,18 +39,16 @@ function reconcileSalesToFinance(int $salesInvoiceId): int
         FROM sales_invoices i
         JOIN sales_orders o ON o.so_id = i.order_id
         JOIN customers c ON c.cus_id = o.customer_id';
-    $invoiceStatement = $sales->prepare($invoiceQuery . ' WHERE i.inv_id = ? ORDER BY i.inv_id');
-    $invoiceStatement->execute([$salesInvoiceId]);
+    $invoiceStatement = $sales->prepare(
+        $invoiceQuery . ($salesInvoiceId === null ? '' : ' WHERE i.inv_id = ?') . ' ORDER BY i.inv_id'
+    );
+    $invoiceStatement->execute($salesInvoiceId === null ? [] : [$salesInvoiceId]);
     $invoices = $invoiceStatement->fetchAll();
     if (!$invoices) {
-        throw new RuntimeException('The Sales invoice was not found.');
-    }
-    $sourceStatus = strtolower(trim((string)$invoices[0]['status']));
-    if ($sourceStatus === 'returned') {
-        throw new DomainException('Returned invoices cannot be sent to Finance.');
-    }
-    if ($sourceStatus !== 'paid') {
-        throw new DomainException('Only paid invoices can be sent to Finance.');
+        if ($salesInvoiceId !== null) {
+            throw new RuntimeException('The Sales invoice was not found.');
+        }
+        return 0;
     }
 
     $finance = db();
@@ -170,13 +168,16 @@ function syncFinanceCollectionToSales(
     $sales->beginTransaction();
     try {
         $invoiceStmt = $sales->prepare(
-            'SELECT inv_id, order_id, invoice_no, invoice_date, total_amount, amount_paid
+            'SELECT inv_id, order_id, invoice_no, invoice_date, total_amount, amount_paid, status
              FROM sales_invoices WHERE inv_id = ? FOR UPDATE'
         );
         $invoiceStmt->execute([$salesInvoiceId]);
         $invoice = $invoiceStmt->fetch();
         if (!$invoice) {
             throw new RuntimeException('The linked Sales invoice was not found.');
+        }
+        if (strtolower(trim((string)$invoice['status'])) === 'returned') {
+            throw new RuntimeException('Collections cannot be recorded for a returned Sales invoice.');
         }
 
         $existing = $sales->prepare('SELECT col_id FROM collections WHERE collection_no = ? LIMIT 1');

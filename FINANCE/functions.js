@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const st = String(rec?.status || '').trim();
         if (/^paid$/i.test(st)) return 'Paid';
         if (/^(partial|partially paid)$/i.test(st)) return 'Partially Paid';
+        if (/^returned$/i.test(st)) return 'Returned';
         return 'Unpaid';
     };
 
@@ -259,14 +260,17 @@ document.addEventListener('DOMContentLoaded', () => {
         revenue:     () => sumAmount((store.accounts || []).filter(a => a.type === 'Revenue' || a.type === 'Income'), a => a.balance),
         expenses:    () => sumAmount(store.expenses),
         payables:    () => sumAmount(store.payables),
-        receivables: () => sumAmount((store.receivables || []).filter(r => r.status !== 'Paid')),
-        receivablesAll: () => sumAmount(store.receivables),
+        receivables: () => sumAmount((store.receivables || []).filter(r => !['Paid', 'Returned'].includes(receivableStatus(r)))),
+        receivablesAll: () => sumAmount((store.receivables || []).filter(r => receivableStatus(r) !== 'Returned')),
         cashBank:    () => sumAmount(store.cashBank, r => r.balance)
     };
+
+    let salesInvoiceSyncWarning = '';
 
     async function syncStateFromServer() {
         try {
             const result = await apiRequest('state');
+            salesInvoiceSyncWarning = String(result.warnings?.salesInvoices || '');
             // If the database returns a state object, replace our local store with it
             if (result.state && typeof result.state === 'object' && Object.keys(result.state).length > 0) {
                 Object.keys(result.state).forEach(key => {
@@ -297,7 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.visibilityState !== 'visible') return;
         const snapshot = () => JSON.stringify([
             store.accounts, store.receivables, store.payables, store.cashBank,
-            store.expenses, store.transactions, store.payments, store.cashFlow
+            store.expenses, store.transactions, store.payments, store.cashFlow,
+            salesInvoiceSyncWarning
         ]);
         const before = snapshot();
         await syncStateFromServer();
@@ -1334,7 +1339,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (key === 'receivables') {
-            const rows = store.receivables || [];
+            const rows = (store.receivables || []).filter(r => receivableStatus(r) !== 'Returned');
             finDetailModal('Total Account Receivable', 'All customer invoices, including paid ones.',
                 ['Invoice', 'Customer', 'Due date', 'Amount', 'Status'],
                 rows.map(r => [escapeHtml(r.invoice), escapeHtml(r.customer), escapeHtml(r.due),
@@ -4897,8 +4902,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const weekEnd = new Date(today);
         weekEnd.setDate(today.getDate() + (6 - today.getDay()));
         const weekEndKey = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
-        const dueToday = rows.filter(row => row.due === todayKey).reduce((s, r) => s + Number(r.amount || 0), 0);
-        const dueThisWeek = rows.filter(row => row.due >= todayKey && row.due <= weekEndKey).reduce((s, r) => s + Number(r.amount || 0), 0);
+        const dueToday = rows.filter(row => receivableStatus(row) !== 'Returned' && row.due === todayKey).reduce((s, r) => s + Number(r.amount || 0), 0);
+        const dueThisWeek = rows.filter(row => receivableStatus(row) !== 'Returned' && row.due >= todayKey && row.due <= weekEndKey).reduce((s, r) => s + Number(r.amount || 0), 0);
         const partiallyPaid = rows.filter(row => receivableStatus(row) === 'Partially Paid').reduce((s, r) => s + Number(r.amount || 0), 0);
         const unpaid = rows.filter(row => receivableStatus(row) === 'Unpaid').reduce((s, r) => s + Number(r.amount || 0), 0);
         const collected = rows.filter(row => row.status === 'Paid').reduce((s, r) => s + Number(r.amount || 0), 0);
@@ -4917,8 +4922,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const weekEnd = new Date(today);
         weekEnd.setDate(today.getDate() + (6 - today.getDay()));
         const weekEndKey = `${weekEnd.getFullYear()}-${String(weekEnd.getMonth() + 1).padStart(2, '0')}-${String(weekEnd.getDate()).padStart(2, '0')}`;
-        const dueToday = rows.filter(row => row.due === todayKey).reduce((sum, row) => sum + Number(row.amount || 0), 0);
-        const dueThisWeek = rows.filter(row => row.due >= todayKey && row.due <= weekEndKey).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+        const dueToday = rows.filter(row => receivableStatus(row) !== 'Returned' && row.due === todayKey).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+        const dueThisWeek = rows.filter(row => receivableStatus(row) !== 'Returned' && row.due >= todayKey && row.due <= weekEndKey).reduce((sum, row) => sum + Number(row.amount || 0), 0);
         const partiallyPaid = rows.filter(row => receivableStatus(row) === 'Partially Paid').reduce((sum, row) => sum + Number(row.amount || 0), 0);
         const unpaid = rows.filter(row => receivableStatus(row) === 'Unpaid').reduce((sum, row) => sum + Number(row.amount || 0), 0);
         const collected = rows.filter(row => row.status === 'Paid').reduce((sum, row) => sum + Number(row.amount || 0), 0);
@@ -4936,6 +4941,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
                 <h2 style="color:#fff; margin:0; font-size:20px;">Receivable DB</h2>
             </div>
+            ${salesInvoiceSyncWarning ? `<p role="alert" style="color:#b42318;background:#fff0ee;padding:10px 14px;border-radius:8px;">${escapeHtml(salesInvoiceSyncWarning)}</p>` : ''}
 
             <!-- 5 Stat Cards -->
             <div class="payables-stat-grid-five">
@@ -5112,7 +5118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <div style="text-align:right; margin-top:40px;">
-                            ${rec.salesId && displayStatus !== 'Paid'
+                            ${rec.salesId && displayStatus !== 'Paid' && displayStatus !== 'Returned'
                                 ? '<button class="btn btn-primary" type="button" data-act="collectAr" style="margin-right:8px;">Record Collection</button>'
                                 : ''}
                             <button class="acc-btn-cancel" type="button" data-act="cancel">Close</button>

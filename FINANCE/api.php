@@ -421,7 +421,7 @@ function loadState(): array
         )->fetchAll(),
         'payables' => $pdo->query(
             "SELECT ap.ap_id AS id, COALESCE(s.supplier_name, '') AS vendor,
-                    ap.invoice_no AS invoice, ap.po_number AS poNumber, ap.due_date AS due,
+                    ap.invoice_no AS invoice, NULL AS poNumber, ap.due_date AS due,
                     ap.amount, ap.payment_id AS paymentId,
                     CASE WHEN LOWER(TRIM(COALESCE(s.supplier_name, ''))) = 'production department'
                          THEN 'Production' ELSE 'Procurement' END AS source,
@@ -452,11 +452,11 @@ function loadState(): array
             "SELECT expense_id AS id, expense_category AS category,
                     COALESCE(description,'') AS vendor, expense_date AS date,
                     amount, status,
-                    COALESCE(voucher_no,'') AS voucher,
-                    COALESCE(payment_method,'') AS paymentMethod,
-                    COALESCE(reference_no,'') AS reference,
-                    COALESCE(receipt_name,'') AS attachmentName,
-                    COALESCE(receipt_data,'') AS attachmentData
+                    '' AS voucher,
+                    '' AS paymentMethod,
+                    COALESCE(receipt_reference,'') AS reference,
+                    '' AS attachmentName,
+                    '' AS attachmentData
              FROM expenses ORDER BY expense_id DESC"
         )->fetchAll(),
         'transactions' => $pdo->query(
@@ -1024,6 +1024,13 @@ if ($action === 'password' && $method === 'POST') {
 // ---------- STATE ----------
 if ($action === 'state' && $method === 'GET') {
     requireUser();
+    $warnings = [];
+    try {
+        reconcileSalesToFinance();
+    } catch (Throwable $e) {
+        error_log('Sales to Finance reconciliation failed: ' . $e->getMessage());
+        $warnings['salesInvoices'] = 'Sales invoices could not be synchronized. The Accounts Receivable list may be out of date.';
+    }
     try {
         reconcileProductionToFinance();
     } catch (Throwable $e) {
@@ -1036,7 +1043,7 @@ if ($action === 'state' && $method === 'GET') {
     } catch (Throwable $e) {
         error_log('AP payment reconciliation failed: ' . $e->getMessage());
     }
-    respond(['ok' => true, 'state' => loadState()]);
+    respond(['ok' => true, 'state' => loadState(), 'warnings' => $warnings]);
 }
 
 if ($action === 'state' && $method === 'POST') {

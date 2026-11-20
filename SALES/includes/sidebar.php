@@ -3,7 +3,7 @@ $current = basename($_SERVER['PHP_SELF']);
 $user = currentUser();
 $userRole = $user['role'] ?? '';
 $corePages = ['quotations.php', 'purchase_orders.php', 'orders.php', 'delivery.php', 'returns.php'];
-$billingPages = ['invoices.php', 'customer_account.php', 'send_to_finance.php'];
+$billingPages = ['invoices.php', 'customer_account.php'];
 $salesReport = ['reports.php'];
 $inventoryPages = ['inventory.php', 'inventory_stockout_approval.php', 'purchase_order_requests.php', 'inventory_delivery_approval.php'];
 $activeSection = '';
@@ -33,7 +33,6 @@ $isCustomer = $userRole === 'Customer';
                 <a class="section-nav <?= $current === 'inventory.php' ? 'active' : '' ?>" href="inventory.php"><span class="nav-icon">I</span><span>Inventory</span><span class="section-arrow">&rsaquo;</span></a>
                 <div class="nav-label">BILLING</div>
                 <a class="section-nav <?= $current === 'customer_account.php' ? 'active' : '' ?>" href="customer_account.php?section=payment"><span class="nav-icon">B</span><span>Payment</span><span class="section-arrow">&rsaquo;</span></a>
-                <a class="section-nav <?= $current === 'send_to_finance.php' ? 'active' : '' ?>" href="send_to_finance.php"><span class="nav-icon">F</span><span>Send Invoice to Finance</span><span class="section-arrow">&rsaquo;</span></a>
                 <div class="nav-label">REPORTS</div>
                 <a class="section-nav <?= $activeSection === 'sales' ? 'active' : '' ?>" href="reports.php?section=sales"><span class="nav-icon">S</span><span>Sales Report</span><span class="section-arrow">&rsaquo;</span></a>
             <?php elseif ($isSalesAdmin): ?>

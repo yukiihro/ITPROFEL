@@ -3,6 +3,8 @@
 
 header('Content-Type: application/json; charset=utf-8');
 
+require_once __DIR__ . '/../includes/functions.php';
+
 function payment_webhook_respond(int $status, string $message): void
 {
     http_response_code($status);
@@ -207,6 +209,7 @@ try {
         $newStatus,
         (int)$invoice['so_id'],
     ]);
+    syncSalesOrderCompletion($pdo, (int)$invoice['so_id']);
 
     $pdo->commit();
     payment_webhook_respond(200, 'Payment recorded successfully.');

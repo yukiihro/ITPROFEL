@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__) . '/SALES/includes/functions.php';
+
 function getSalesDB(): PDO
 {
     static $pdo = null;
@@ -198,11 +200,24 @@ function syncFinanceCollectionToSales(
         if ($isNewCollection) {
             $newPaid = min((float)$invoice['total_amount'], $newPaid + $amount);
         }
+
         $status = $newPaid >= (float)$invoice['total_amount'] ? 'Paid' : 'Partially Paid';
         $update = $sales->prepare(
             'UPDATE sales_invoices SET amount_paid = ?, status = ? WHERE inv_id = ?'
         );
         $update->execute([$newPaid, $status, $salesInvoiceId]);
+        $orderId = (int)$invoice['order_id'];
+        $sales->prepare(
+            "UPDATE sales_orders
+             SET payment_method = CASE
+                     WHEN ? IN ('GCash', 'Bank Transfer') THEN ?
+                     ELSE payment_method
+                 END,
+                 payment_status = ?, payment_reference = ?,
+                 paid_at = CASE WHEN ? = 'Paid' THEN COALESCE(paid_at, NOW()) ELSE paid_at END
+             WHERE so_id = ?"
+        )->execute([$method, $method, $status, $collectionNo, $status, $orderId]);
+        syncSalesOrderCompletion($sales, $orderId);
 
         $sales->commit();
     } catch (Throwable $e) {

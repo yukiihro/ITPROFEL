@@ -2635,144 +2635,6 @@ table.data-table {
 }
 
 /* ============================================================
-   BANK RECONCILIATION PAGE (MATCHING SCREENSHOT)
-   ============================================================ */
-
-.bank-recon-page-card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 28px 32px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    min-height: calc(100vh - 140px);
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.bank-recon-page-header {
-    margin-bottom: 24px;
-}
-
-.bank-recon-page-header h2 {
-    margin: 0;
-    font-size: 24px;
-    color: #5c1111;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-}
-
-/* Table (header bar + raised rows card) */
-.bank-recon-scroll {
-    overflow-x: auto;
-}
-
-.bank-recon-head,
-.bank-recon-row {
-    display: grid;
-    grid-template-columns: 1.3fr 1.2fr 1.3fr 1fr 1fr;
-    align-items: center;
-    min-width: 620px;
-    box-sizing: border-box;
-}
-
-.bank-recon-head {
-    background: #cb0000;
-    color: #ffffff;
-    border-radius: 4px;
-    padding: 10px 22px;
-    font-size: 15px;
-    font-weight: 500;
-    text-align: center;
-}
-
-.bank-recon-head span:first-child,
-.bank-recon-row span:first-child {
-    text-align: left;
-}
-
-.bank-recon-body {
-    background: #f3eded;
-    border: 1px solid #e2d8d8;
-    border-radius: 6px;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
-    margin-top: 8px;
-    padding: 8px 22px;
-    min-width: 620px;
-    box-sizing: border-box;
-}
-
-.bank-recon-row {
-    padding: 14px 0;
-    font-size: 13.5px;
-    color: #222;
-    text-align: center;
-}
-
-.bank-recon-row span:first-child {
-    font-size: 15px;
-    font-weight: 700;
-    color: #111;
-}
-
-/* Status text - plain, no pill */
-.recon-status {
-    font-size: 15px;
-    color: #111;
-    font-weight: 600;
-}
-
-/* Bank Reconciliation modal (same look as the page) */
-.modal.bank-recon-modal {
-    max-width: 780px !important;
-    padding: 0 !important;
-    overflow: hidden;
-}
-
-.modal.bank-recon-modal .modal-header {
-    display: none !important;
-}
-
-.modal.bank-recon-modal .modal-body {
-    padding: 26px 28px 24px !important;
-}
-
-.bank-recon-modal-title {
-    font-size: 24px;
-    font-weight: 700;
-    color: #5c1111;
-    letter-spacing: -0.3px;
-    margin-bottom: 20px;
-}
-
-.modal.bank-recon-modal .bank-recon-head,
-.modal.bank-recon-modal .bank-recon-body {
-    min-width: 600px;
-}
-
-.bank-recon-input {
-    width: 110px;
-    max-width: 100%;
-    padding: 4px 8px;
-    font: inherit;
-    font-size: 13.5px;
-    text-align: center;
-    color: #222;
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid #d9cccc;
-    border-radius: 4px;
-    box-sizing: border-box;
-}
-
-.bank-recon-input:focus {
-    outline: none;
-    border-color: #cb0000;
-    background: #fff;
-}
-
-.modal.bank-recon-modal .form-actions {
-    margin-top: 22px;
-}
-
-/* ============================================================
    RECEIVABLE / CHART OF ACCOUNTS VIEW MODAL - EXACT MATCH
    ============================================================ */
 
@@ -4502,8 +4364,7 @@ table.data-table {
 .payables-table-scroll,
 .invoice-voucher-scroll,
 .cash-accounts-card .table-wrap,
-.cash-transactions-card .table-wrap,
-.bank-recon-scroll {
+.cash-transactions-card .table-wrap {
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
@@ -4532,7 +4393,6 @@ table.data-table {
 .invoice-voucher-scroll::-webkit-scrollbar,
 .cash-accounts-card .table-wrap::-webkit-scrollbar,
 .cash-transactions-card .table-wrap::-webkit-scrollbar,
-.bank-recon-scroll::-webkit-scrollbar,
 .fin-report-preview::-webkit-scrollbar {
     height: 8px;
 }
@@ -4547,7 +4407,6 @@ table.data-table {
 .invoice-voucher-scroll::-webkit-scrollbar-thumb,
 .cash-accounts-card .table-wrap::-webkit-scrollbar-thumb,
 .cash-transactions-card .table-wrap::-webkit-scrollbar-thumb,
-.bank-recon-scroll::-webkit-scrollbar-thumb,
 .fin-report-preview::-webkit-scrollbar-thumb {
     background: rgba(160, 21, 21, 0.35);
     border-radius: 999px;
@@ -4563,7 +4422,6 @@ table.data-table {
 .invoice-voucher-scroll::-webkit-scrollbar-track,
 .cash-accounts-card .table-wrap::-webkit-scrollbar-track,
 .cash-transactions-card .table-wrap::-webkit-scrollbar-track,
-.bank-recon-scroll::-webkit-scrollbar-track,
 .fin-report-preview::-webkit-scrollbar-track {
     background: transparent;
 }
@@ -5418,17 +5276,11 @@ input[type="search"]::-moz-search-cancel-button {
     background: #fafafa;
 }
 
-/* 5. Financial Reports + Bank Reconciliation rows follow the same design */
+/* 5. Financial Reports rows follow the same design */
 .fr-row-head { background: #c2181a; }
 .fr-row:not(.fr-row-head):not(.fr-row-total) {
     background: #fff;
     border-bottom: 1px solid #e5e5e5;
-}
-
-.bank-recon-head { background: #c2181a; }
-.bank-recon-body {
-    background: #fff;
-    border: 1px solid #e5e5e5;
 }
 
 /* 6. Export preview table (was unstyled before) */
@@ -5501,3 +5353,84 @@ input[type="search"]::-moz-search-cancel-button {
 .cash-active-badge.is-inactive {
     color: #d8000c;
 }
+/* ============================================================
+   SUPPORT — SYSTEM GUIDE
+   ============================================================ */
+.guide-wrap { max-width: 1040px; margin: 0 auto; }
+.guide-intro { display: flex; align-items: flex-start; gap: 16px; padding: 22px 24px; }
+.guide-intro-icon {
+    width: 44px; height: 44px; flex: 0 0 44px; padding: 8px;
+    border-radius: 9px; display: grid; place-items: center;
+    background: rgba(194, 24, 26, 0.10); color: var(--brand-red);
+}
+.guide-intro-icon svg { width: 100%; height: 100%; }
+.guide-eyebrow {
+    margin: 0 0 4px; font-size: 10.5px; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--brand-red);
+}
+.guide-intro h2 { margin: 0 0 6px; font-size: 20px; color: var(--text-strong); }
+.guide-intro p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+.guide-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px; margin: 16px 0;
+}
+.guide-link {
+    display: flex; flex-direction: column; gap: 8px; padding: 16px;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow-soft);
+    color: inherit; text-decoration: none;
+    transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+.guide-link:hover {
+    border-color: rgba(194, 24, 26, .35); transform: translateY(-1px);
+    box-shadow: var(--shadow-card);
+}
+.guide-link-icon {
+    width: 34px; height: 34px; padding: 8px; border-radius: 9px;
+    display: grid; place-items: center;
+    background: rgba(194, 24, 26, .10); color: var(--brand-red);
+}
+.guide-link-icon svg { width: 100%; height: 100%; }
+.guide-link h3 { margin: 0; font-size: 13.5px; color: var(--text-strong); }
+.guide-link p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-muted); }
+.guide-link-go { margin-top: auto; font-size: 12px; font-weight: 600; color: var(--brand-red); }
+.guide-panel { margin-top: 16px; }
+.guide-panel-head { padding: 18px 22px 0; }
+.guide-panel-head h3 { margin: 0 0 4px; font-size: 16px; color: var(--text-strong); }
+.guide-panel-head p { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.guide-search { position: relative; padding: 14px 22px; }
+.guide-search svg {
+    position: absolute; left: 34px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: #999;
+}
+.guide-search input {
+    width: 100%; padding: 9px 12px 9px 36px; border: 1px solid var(--border-strong);
+    border-radius: 8px; background: #fff; color: var(--text);
+    font: inherit; font-size: 13px;
+}
+.guide-search input:focus { outline: none; border-color: var(--brand-red); }
+.guide-faq { padding: 0 22px 8px; }
+.guide-faq details { border-top: 1px solid var(--border); padding: 12px 0; }
+.guide-faq details:first-child { border-top: 0; }
+.guide-faq summary {
+    cursor: pointer; list-style: none; display: flex;
+    justify-content: space-between; gap: 12px;
+    font-size: 13px; font-weight: 600; color: var(--text-strong);
+}
+.guide-faq summary::-webkit-details-marker { display: none; }
+.guide-faq summary::after { content: '+'; color: var(--brand-red); font-weight: 700; }
+.guide-faq details[open] summary::after { content: '\2212'; }
+.guide-faq details p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); }
+.guide-faq-empty {
+    padding: 18px 22px 24px; text-align: center;
+    color: var(--text-muted); font-size: 13px;
+}
+.guide-faq-empty[hidden] { display: none; }
+.guide-help {
+    margin-top: 16px; padding: 18px 22px;
+    background: rgba(194, 24, 26, .035); border-color: rgba(194, 24, 26, .14);
+}
+.guide-help h3 { margin: 0 0 6px; font-size: 14px; color: var(--text-strong); }
+.guide-help p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); }
+.guide-help strong { color: var(--text-strong); }
+@media (max-width: 720px) { .guide-grid { grid-template-columns: 1fr; } }

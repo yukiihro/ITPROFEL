@@ -443,7 +443,6 @@ function loadState(): array
         }, $pdo->query(
             "SELECT account_id AS id, account_name AS account, account_type AS type,
                     bank_name, account_no AS accountNumber, balance,
-                    NULL AS statementBalance,
                     COALESCE(description,'') AS description,
                     'Active' AS status
              FROM cash_bank ORDER BY account_id"

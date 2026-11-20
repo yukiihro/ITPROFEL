@@ -25,7 +25,7 @@ if (strcasecmp($dept, 'HR') !== 0) {
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>D.E.V.S · HR Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=20261120dashdept1">
+    <link rel="stylesheet" href="style.css?v=20261120guide1">
 </head>
 <body>
 
@@ -225,6 +225,6 @@ if (strcasecmp($dept, 'HR') !== 0) {
 
     <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
-        <script src="functions.js?v=20261120removeui1" defer></script>
+        <script src="functions.js?v=20261120guide1" defer></script>
 </body>
 </html>

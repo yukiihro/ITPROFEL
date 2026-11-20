@@ -557,10 +557,10 @@ document.addEventListener('DOMContentLoaded', () => {
             })
         };
         if (entity === 'contribution') return {
-            screen: 'Contribution', headers: ['Employee ID', 'Employee', 'Department', 'Basic Salary ₱', 'Employer Share ₱', 'Employee Share ₱', 'Total Contribution ₱', 'Status', 'Period'],
+            screen: 'Contribution', headers: ['Employee ID', 'Employee', 'Department', 'Basic Salary ₱', 'Employer Share ₱', 'Employee Share ₱', 'Total Contribution ₱', 'Period'],
             rows: store.contributions.map(c => {
                 const shares = contributionRowShares(c);
-                return [c.empNo || c.empId, c.employeeName || recordEmployeeName(c), c.dept || '—', Number(c.basicSalary) || 0, shares.employer, shares.ee, shares.total, contributionStatus(c), c.period || ''];
+                return [c.empNo || c.empId, c.employeeName || recordEmployeeName(c), c.dept || '—', Number(c.basicSalary) || 0, shares.employer, shares.ee, shares.total, c.period || ''];
             })
         };
         if (entity === '13thmonth') return {
@@ -3069,11 +3069,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return { ee, er: ee, ec: 0, employer: ee, total: ee + ee };
     }
 
-    function contributionStatus(row) {
-        const s = String(row.payrollStatus || '').toLowerCase();
-        return (s === 'paid' || s === 'processed' || s === 'completed') ? 'Posted' : 'Pending';
-    }
-
     function contributionAgencyFilter() {
         return String($('#gcDeptBtn')?.dataset.value || '');
     }
@@ -3083,7 +3078,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dept = contributionAgencyFilter();
         return store.contributions.filter(c => {
             const matchType = contributionTypeKey(c.type) === contribActiveTab;
-            const text = idSearchText(c.empNo, c.empId, c.employeeName, c.period, c.status);
+            const text = idSearchText(c.empNo, c.empId, c.employeeName, c.period);
             const matchQ = !q || text.includes(q);
             const matchD = !dept || c.dept === dept;
             return matchType && matchQ && matchD;
@@ -3175,7 +3170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <th>Employer Share</th>
                                     <th>Employee Share</th>
                                     <th>Total Contribution</th>
-                                    <th>Status</th>
+
                                     <th style="text-align:right;">Action</th>
                                 </tr>
                             </thead>
@@ -3207,8 +3202,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const shares = contributionRowShares(row);
         const agency = CONTRIB_AGENCIES[contributionTypeKey(row.type)] || CONTRIB_AGENCIES[contribActiveTab];
-        const status = contributionStatus(row);
-        const statusClass = status === 'Posted' ? 'is-paid' : 'is-fulfilling';
         host.innerHTML = `
             <div class="gc-details-head">
                 ${agencyBadgeHtml(contributionTypeKey(row.type) || contribActiveTab)}
@@ -3222,7 +3215,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="gc-detail-row"><span>Employee Share (EE)</span><b>${peso(shares.ee)}</b></div>
                 <div class="gc-detail-row"><span>Employer Share (ER)</span><b>${peso(shares.er)}</b></div>
                 ${shares.ec > 0 ? `<div class="gc-detail-row"><span>Employer EC (EC/SIF)</span><b>${peso(shares.ec)}</b></div>` : ''}
-                <div class="gc-detail-row"><span>Status</span><b><span class="status-text ${statusClass}">${escapeHtml(status)}</span></b></div>
             </dl>
             <div class="gc-breakdown">
                 <div class="gc-breakdown-row"><span>Employer (${escapeHtml(agency.label)}) Contribution</span><b>${peso(shares.employer)}</b></div>
@@ -3280,7 +3272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!contribSelectedId) contribSelectedId = rows[0]?.id || null;
 
         if (!pageRows.length) {
-            tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">◌</div><strong>No contribution records</strong><p>No ${escapeHtml(CONTRIB_AGENCIES[contribActiveTab].label)} contributions match the current filters.</p></div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">◌</div><strong>No contribution records</strong><p>No ${escapeHtml(CONTRIB_AGENCIES[contribActiveTab].label)} contributions match the current filters.</p></div></td></tr>`;
             renderContributionDetails(null);
             renderContributionPagination(totalPages, 0);
             return;
@@ -3292,8 +3284,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = pageRows.map(c => {
             const shares = contributionRowShares(c);
             const empName = c.employeeName || c.empId;
-            const status = contributionStatus(c);
-            const statusClass = status === 'Posted' ? 'is-paid' : 'is-fulfilling';
             return `
             <tr data-id="${escapeHtml(c.id || '')}" class="${c.id === selected.id ? 'is-selected' : ''}">
                 <td><strong style="font-family:monospace;color:#555;">${escapeHtml(c.empNo || c.empId)}</strong></td>
@@ -3303,7 +3293,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${peso(shares.employer)}</td>
                 <td>${peso(shares.ee)}</td>
                 <td><strong>${peso(shares.total)}</strong></td>
-                <td><span class="status-text ${statusClass}">${escapeHtml(status)}</span></td>
                 <td>
                     <div class="cell-actions" style="justify-content:flex-end;">
                         <button class="coa-view-btn" type="button" data-act="viewContribution" data-id="${escapeHtml(c.id)}">View</button>
@@ -3314,7 +3303,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const missing = CONTRIB_ROWS_PER_PAGE - pageRows.length;
         for (let i = 0; i < missing; i++) {
-            tbody.innerHTML += `<tr class="at-spacer-row"><td colspan="9">&nbsp;</td></tr>`;
+            tbody.innerHTML += `<tr class="at-spacer-row"><td colspan="8">&nbsp;</td></tr>`;
         }
 
         renderContributionDetails(selected);
@@ -3325,8 +3314,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function openContributionView(c) {
         const shares = contributionRowShares(c);
         const agency = CONTRIB_AGENCIES[contributionTypeKey(c.type)] || { label: 'Contribution', full: '' };
-        const status = contributionStatus(c);
-        const statusClass = status === 'Posted' ? 'is-paid' : 'is-fulfilling';
         const emp = empById(c.empId);
         const empName = c.employeeName || emp?.name || c.empId || '—';
 
@@ -3371,9 +3358,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${shares.ec > 0 ? `<div class="view-modal-row"><span>Employer EC (EC/SIF):</span> <strong style="color:#1aa846;">${peso(shares.ec)}</strong></div>` : ''}
                             <div class="view-modal-row" style="border-top:1px solid #f0e0e0;padding-top:10px;margin-top:6px;">
                                 <span>Total Contribution:</span> <strong style="color:#c2181a;font-size:15px;">${peso(shares.total)}</strong>
-                            </div>
-                            <div class="view-modal-row"><span>Status:</span>
-                                <strong class="status-text ${statusClass}">${escapeHtml(status)}</strong>
                             </div>
                         </div>
 
@@ -4215,59 +4199,88 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    const GUIDE_ICON = (paths) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+
+    const HR_GUIDE_LINKS = [
+        { page: 'dashboard', icon: GUIDE_ICON('<path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/>'), title: 'Dashboard', text: 'A snapshot of today’s HR activity.' },
+        { page: 'employees', icon: GUIDE_ICON('<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3 3 0 0 1 0 6"/><path d="M17 14a6 6 0 0 1 4 6"/>'), title: 'Employees Master', text: 'Employee records and workforce status.' },
+        { page: 'attendance', icon: GUIDE_ICON('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'), title: 'Attendance', text: 'Daily time-in and time-out entries.' },
+        { page: 'leave', icon: GUIDE_ICON('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/>'), title: 'Leave Requests', text: 'Review and manage employee leave.' },
+        { page: 'payroll', icon: GUIDE_ICON('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>'), title: 'Payroll', text: 'Create and review payroll by period.' },
+        { page: 'payrollHistory', icon: GUIDE_ICON('<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/>'), title: 'Payroll History', text: 'Search and review past payroll records.' },
+        { page: 'deductions', icon: GUIDE_ICON('<path d="M12 3v18"/><path d="M17 7H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H7"/>'), title: 'Deductions', text: 'Salary deductions and their reasons.' },
+        { page: 'contribution', icon: GUIDE_ICON('<path d="M12 3 3 7v5c0 5 3.8 8.4 9 9 5.2-.6 9-4 9-9V7z"/><path d="m9 12 2 2 4-4"/>'), title: 'Contribution', text: 'SSS, PhilHealth, and Pag-IBIG shares.' },
+        { page: '13thmonth', icon: GUIDE_ICON('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 14h3"/>'), title: '13th Month Pay', text: 'Year-end bonus records.' },
+        { page: 'accountManagement', icon: GUIDE_ICON('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'), title: 'Account Management', text: 'User accounts and password resets.' },
+        { page: 'pageAccess', icon: GUIDE_ICON('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'), title: 'User Permission', text: 'Control which pages each user sees.' },
+        { page: 'notifications', icon: GUIDE_ICON('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>'), title: 'Notifications', text: 'Updates from across the HR team.' }
+    ];
+
+    const HR_GUIDE_FAQS = [
+        { q: 'How do I get started in HR?', a: 'Use the sidebar to move between pages. The Dashboard shows today’s HR snapshot. The bell in the top bar lists recent changes; click one to jump straight to that page.' },
+        { q: 'How do I add or update an employee?', a: 'Open Employees Master. You can search by name or by any ID form, including Employee ID, then add or edit a record there.' },
+        { q: 'How do leave requests affect pay?', a: 'Approved leave requests create deduction rows in Deductions, grouped by employee and payroll period. Use View on a row to see each reason.' },
+        { q: 'How do I run payroll?', a: 'Open Payroll, set the payroll period, and create payroll. The Dashboard groups net pay by department. Printing uses the payroll period dates, not the date the record was created.' },
+        { q: 'Why is there no Delete action on payroll?', a: 'Payroll rows are view-only to protect payroll history. Use View to inspect a record.' },
+        { q: 'Where do contributions come from?', a: 'SSS, PhilHealth, and Pag-IBIG contributions are derived from payroll records. Open Contribution to review the employer and employee shares per employee and period.' },
+        { q: 'What is 13th Month Pay?', a: 'It is the total basic salary earned for the year divided by 12, payable on or before December 24. Open 13th Month Pay to review the records.' },
+        { q: 'How do I control who sees which page?', a: 'Open User Permission (administrators only). Check or uncheck a page for a user. The sidebar updates for that user the next time they load the system — this also controls Finance pages.' },
+        { q: 'How do I reset someone’s password?', a: 'Open Account Management and use Reset password. The employee will need the new password to sign in.' },
+        { q: 'How do I find a record quickly?', a: 'Every search bar accepts names and any ID form, including Employee ID. Tables are paginated — use the numbered buttons at the bottom to move between pages.' },
+        { q: 'Who changed an employee record?', a: 'Open Audit Trail. It lists who changed what and when, and it is also the source of the notification bell.' },
+        { q: 'A page is missing from my sidebar. What do I do?', a: 'An HR Administrator controls page visibility in User Permission. Ask them to grant you access to the page you need.' },
+        { q: 'I forgot my password. Who can reset it?', a: 'Ask another HR Administrator to reset it from Account Management. You will need the new password to sign in again.' }
+    ];
+
     function buildSupport() {
         const profile = JSON.parse(localStorage.getItem('devs_profile') || '{}');
-        const me = profile.fullName || profile.email || 'User';
+        const me = profile.fullName || profile.email || 'there';
+        const links = HR_GUIDE_LINKS.map(link => `
+            <a href="#" class="guide-link" data-goto-page="${link.page}">
+                <span class="guide-link-icon">${link.icon}</span>
+                <h3>${escapeHtml(link.title)}</h3>
+                <p>${escapeHtml(link.text)}</p>
+                <span class="guide-link-go">Open page →</span>
+            </a>
+        `).join('');
+        const faqs = HR_GUIDE_FAQS.map((item, i) => `
+            <details class="guide-faq-item" data-guide-faq="${i}">
+                <summary>${escapeHtml(item.q)}</summary>
+                <p>${escapeHtml(item.a)}</p>
+            </details>
+        `).join('');
+
         return `
-            <div class="section-title"><h2>Support</h2><span class="hint">Help and assistance</span></div>
-            <div class="card" style="max-width:760px;">
-                <div style="padding:6px 2px;">
-                    <p style="margin:0 0 18px;font-size:13.5px;line-height:1.6;color:#555;">
-                        Need help with the HRIS? Below are quick answers to the most common questions.
-                        If your issue is not listed, contact the system administrator.
-                    </p>
-
-                    <div style="display:flex;flex-direction:column;gap:12px;">
-                        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
-                            <strong style="font-size:13px;">I forgot my password.</strong>
-                            <p style="margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#777;">
-                                Ask an HR Administrator to reset it for you in
-                                <a href="#" data-goto-page="accountManagement">Account Management</a>.
-                            </p>
-                        </div>
-                        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
-                            <strong style="font-size:13px;">A page is missing from my sidebar.</strong>
-                            <p style="margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#777;">
-                                Page visibility is controlled by your HR Administrator in
-                                <a href="#" data-goto-page="pageAccess">User Permission</a>. Ask them to grant you access to the page you need.
-                            </p>
-                        </div>
-                        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
-                            <strong style="font-size:13px;">My data (payroll, attendance, leave) looks wrong.</strong>
-                            <p style="margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#777;">
-                                Record edits are made by HR Administrators in the corresponding module. Check the
-                                <a href="#" data-goto-page="auditTrail">Audit Trail</a> to see who changed what and when.
-                            </p>
-                        </div>
-                        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
-                            <strong style="font-size:13px;">How do 13th month pay and contributions work?</strong>
-                            <p style="margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#777;">
-                                13th month pay equals the total basic salary earned for the year ÷ 12 and is payable on or
-                                before December 24 — see <a href="#" data-goto-page="13thmonth">13th Month Pay</a>.
-                                SSS, PhilHealth, and Pag-IBIG contributions are listed per employee in
-                                <a href="#" data-goto-page="contribution">Contribution</a>.
-                            </p>
-                        </div>
+            <div class="section-title"><h2>Support</h2><span class="hint">System guide and quick answers</span></div>
+            <div class="guide-wrap">
+                <section class="card guide-intro">
+                    <span class="guide-intro-icon">${GUIDE_ICON('<path d="M12 3 3 7v5c0 5 3.8 8.4 9 9 5.2-.6 9-4 9-9V7z"/><path d="m9 12 2 2 4-4"/>')}</span>
+                    <div>
+                        <p class="guide-eyebrow">D.E.V.S · HR</p>
+                        <h2>System Guide</h2>
+                        <p>A short guide to the HR portal: where each record lives, how leave, payroll, and contributions connect, and what to do when something looks wrong. Pick a page below or search the questions.</p>
                     </div>
+                </section>
 
-                    <div style="margin-top:20px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:#fafafa;">
-                        <strong style="font-size:13px;">Still need help?</strong>
-                        <p style="margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#777;">
-                            Contact the system administrator: <strong>admin26@gmail.com</strong><br />
-                            Signed in as: <strong>${escapeHtml(me)}</strong>
-                        </p>
+                <div class="guide-grid">${links}</div>
+
+                <section class="card guide-panel">
+                    <div class="guide-panel-head">
+                        <h3>Frequently asked questions</h3>
+                        <p>Type a word to narrow the list. Click a question to expand the answer.</p>
                     </div>
-                </div>
+                    <div class="guide-search">
+                        ${GUIDE_ICON('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>')}
+                        <input type="search" id="guideSearch" placeholder="Search the guide…" aria-label="Search guide questions" autocomplete="off" />
+                    </div>
+                    <div class="guide-faq" id="guideFaqList">${faqs}</div>
+                    <div class="guide-faq-empty" id="guideFaqEmpty" hidden>No topics match your search. Try a different word.</div>
+                </section>
+
+                <section class="card guide-help">
+                    <h3>Still need help?</h3>
+                    <p>Contact the system administrator with the page name and a short description of the issue. Signed in as <strong>${escapeHtml(me)}</strong>.</p>
+                </section>
             </div>
         `;
     }
@@ -4808,13 +4821,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (page === 'support') {
-            document.querySelectorAll('[data-goto-page]').forEach(a => {
-                a.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const target = a.dataset.gotoPage;
-                    const link = document.querySelector(`.nav-item[data-page="${target}"]`);
-                    if (link && link.style.display !== 'none') link.click();
+            const input = $('#guideSearch');
+            const items = $$('#guideFaqList .guide-faq-item');
+            const empty = $('#guideFaqEmpty');
+            const applyGuideSearch = () => {
+                const term = (input?.value || '').trim().toLowerCase();
+                let shown = 0;
+                items.forEach(item => {
+                    const hit = !term || item.textContent.toLowerCase().includes(term);
+                    item.style.display = hit ? '' : 'none';
+                    if (hit) shown++;
                 });
+                if (empty) empty.hidden = shown > 0;
+            };
+            input?.addEventListener('input', throttle(guard(applyGuideSearch), 100));
+            $$('.guide-link[data-goto-page]').forEach(card => {
+                const target = card.dataset.gotoPage;
+                const allowed = !!pages[target] && canAccessPage(target)
+                    && (target !== 'pageAccess' || isHrAdmin());
+                if (!allowed) {
+                    card.style.display = 'none';
+                    return;
+                }
+                card.addEventListener('click', guard((e) => {
+                    e.preventDefault();
+                    $$('.nav-item').forEach(link => link.classList.remove('active'));
+                    const navLink = document.querySelector(`.nav-item[data-page="${target}"]`);
+                    if (navLink) navLink.classList.add('active');
+                    localStorage.setItem('devs_last_page', target);
+                    renderPage(target);
+                }));
             });
         }
 

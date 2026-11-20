@@ -230,7 +230,6 @@ function loadState(): array
                 p.basic_salary AS basicSalary,
                 d.amount AS employeeShare,
                 p.payroll_period AS period,
-                p.status AS payrollStatus,
                 CASE e.department
                              WHEN 1 THEN 'Finance'
                              WHEN 2 THEN 'HR'
@@ -293,7 +292,6 @@ function loadState(): array
                 'basicSalary'    => $emp['basic_salary'],
                 'employeeShare'  => null,
                 'period'         => null,
-                'payrollStatus'  => null,
                 'dept'           => $emp['dept']
             ];
         }
@@ -1572,7 +1570,6 @@ if ($action === 'access.catalog' && $method === 'GET') {
                 'finFinancialReports'      => 'Financial Reports',
                 'finPaymentManagement'     => 'Payment Management',
                 'finFinancialTransactions' => 'Financial Transactions',
-                'finBankReconciliation'    => 'Bank Reconciliation',
                 'finAuditTrail'            => 'Audit Trail',
                 'finSupport'               => 'Support',
                 'finSettings'              => 'Settings',

@@ -43,8 +43,12 @@ function reconcileSalesToFinance(int $salesInvoiceId): int
     if (!$invoices) {
         throw new RuntimeException('The Sales invoice was not found.');
     }
-    if (strtolower(trim((string)$invoices[0]['status'])) === 'returned') {
+    $sourceStatus = strtolower(trim((string)$invoices[0]['status']));
+    if ($sourceStatus === 'returned') {
         throw new DomainException('Returned invoices cannot be sent to Finance.');
+    }
+    if ($sourceStatus !== 'paid') {
+        throw new DomainException('Only paid invoices can be sent to Finance.');
     }
 
     $finance = db();

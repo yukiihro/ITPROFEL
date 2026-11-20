@@ -42,6 +42,7 @@ include __DIR__ . '/includes/header.php';
                 <?php endif; ?>
                 <?php foreach ($invoices as $invoice): ?>
                     <?php $isReturned = strtolower(trim((string)$invoice['status'])) === 'returned'; ?>
+                    <?php $isPaid = strtolower(trim((string)$invoice['status'])) === 'paid'; ?>
                     <tr>
                         <td><strong><?= htmlspecialchars($invoice['invoice_no']) ?></strong></td>
                         <td><?= htmlspecialchars($invoice['customer_name']) ?></td>
@@ -56,8 +57,9 @@ include __DIR__ . '/includes/header.php';
                                 data-send-invoice="<?= (int)$invoice['inv_id'] ?>"
                                 data-invoice-no="<?= htmlspecialchars($invoice['invoice_no'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-returned="<?= $isReturned ? '1' : '0' ?>"
+                                data-paid="<?= $isPaid ? '1' : '0' ?>"
                                 disabled>
-                                <?= $isReturned ? 'Returned - Cannot Send' : 'Checking...' ?>
+                                <?= $isReturned ? 'Returned - Cannot Send' : ($isPaid ? 'Checking...' : 'Not Paid - Cannot Send') ?>
                             </button>
                         </td>
                     </tr>
@@ -88,6 +90,8 @@ include __DIR__ . '/includes/header.php';
             financeSyncButtons.forEach((button) => {
                 if (button.dataset.returned === '1') {
                     button.textContent = 'Returned - Cannot Send';
+                } else if (button.dataset.paid !== '1') {
+                    button.textContent = 'Not Paid - Cannot Send';
                 } else if (sentInvoiceIds.has(Number(button.dataset.sendInvoice))) {
                     button.textContent = 'Already Sent';
                 } else {
@@ -112,6 +116,7 @@ include __DIR__ . '/includes/header.php';
     financeSyncButtons.forEach((button) => {
         button.addEventListener('click', async () => {
             if (button.disabled || button.dataset.returned === '1') return;
+            if (button.dataset.paid !== '1') return;
 
             const invoiceId = Number(button.dataset.sendInvoice);
             const invoiceNo = button.dataset.invoiceNo || 'invoice';
@@ -143,8 +148,11 @@ include __DIR__ . '/includes/header.php';
                 financeSyncNotice.hidden = false;
             } catch (error) {
                 const isReturned = error.status === 422 && /returned/i.test(error.message);
-                button.disabled = isReturned;
-                button.textContent = isReturned ? 'Returned - Cannot Send' : 'Send to Finance';
+                const isNotPaid = error.status === 422 && /only paid invoices/i.test(error.message);
+                button.disabled = isReturned || isNotPaid;
+                button.textContent = isReturned
+                    ? 'Returned - Cannot Send'
+                    : (isNotPaid ? 'Not Paid - Cannot Send' : 'Send to Finance');
                 financeSyncNotice.className = 'alert error';
                 financeSyncNotice.textContent = error.message || 'The invoice could not be sent to Finance. Please try again.';
                 financeSyncNotice.hidden = false;

@@ -14,6 +14,19 @@
     }
 
     const originalButtonHTML = button.innerHTML;
+    let aliasSuggestions = [];
+    let variantApprovalCheckbox = null;
+    const catalogWarning = document.createElement('div');
+    catalogWarning.id = 'catalogMatchPreflight';
+    catalogWarning.setAttribute('role', 'status');
+    catalogWarning.style.whiteSpace = 'pre-line';
+    catalogWarning.style.padding = '12px';
+    catalogWarning.style.margin = '12px 0';
+    catalogWarning.style.border = '1px solid #e6b1b1';
+    catalogWarning.style.borderRadius = '6px';
+    catalogWarning.style.background = '#fff5f5';
+    catalogWarning.hidden = true;
+    message.insertAdjacentElement('afterend', catalogWarning);
 
     // Display errors on the page instead of using alerts
     function showMessage(text, isError = false) {
@@ -35,13 +48,59 @@
 
             const data = await response.json();
 
-            if (
-                response.ok &&
-                data.success &&
-                data.suppliers?.length
-            ) {
-                button.disabled = false;
-                button.removeAttribute("title");
+            if (response.ok && data.success && data.suppliers?.length) {
+                const missingCatalog = [];
+                aliasSuggestions = [];
+                for (const supplier of data.suppliers) {
+                    for (const item of (supplier.items || [])) {
+                        const label = `${supplier.name}: ${item.item_name} (${item.unit})`;
+                        if (!item.supplier_item_id) {
+                            missingCatalog.push(`${label} — ${item.catalog_issue || 'not in catalog'}`);
+                        } else if (item.catalog_match_type === 'alias') {
+                            aliasSuggestions.push(`${label} → ${item.catalog_item_name}`);
+                        }
+                    }
+                }
+                if (missingCatalog.length) {
+                    button.disabled = true;
+                    button.title = 'Resolve missing or ambiguous active supplier catalog items first';
+                    catalogWarning.hidden = false;
+                    catalogWarning.textContent = 'Cannot save until these supplier catalog records are corrected:\n' + missingCatalog.join('\n');
+                } else {
+                    variantApprovalCheckbox = null;
+                    if (aliasSuggestions.length) {
+                        button.disabled = true;
+                        button.title = 'Confirm supplier product variants before saving';
+                        catalogWarning.hidden = false;
+                        catalogWarning.textContent = 'Supplier catalog variant(s) found. Confirm these are the intended products before saving:\n' + aliasSuggestions.join('\n');
+
+                        const approvalRow = document.createElement('label');
+                        approvalRow.style.display = 'flex';
+                        approvalRow.style.alignItems = 'flex-start';
+                        approvalRow.style.gap = '9px';
+                        approvalRow.style.marginTop = '12px';
+                        approvalRow.style.fontWeight = '600';
+                        approvalRow.style.cursor = 'pointer';
+                        variantApprovalCheckbox = document.createElement('input');
+                        variantApprovalCheckbox.type = 'checkbox';
+                        variantApprovalCheckbox.id = 'catalogVariantApproval';
+                        variantApprovalCheckbox.style.marginTop = '3px';
+                        const approvalLabel = document.createElement('span');
+                        approvalLabel.textContent = 'I confirm these supplier product variants are acceptable for this quotation.';
+                        approvalRow.append(variantApprovalCheckbox, approvalLabel);
+                        catalogWarning.append(approvalRow);
+                        variantApprovalCheckbox.addEventListener('change', () => {
+                            button.disabled = !variantApprovalCheckbox.checked;
+                            if (variantApprovalCheckbox.checked) button.removeAttribute('title');
+                            else button.title = 'Confirm supplier product variants before saving';
+                        });
+                    } else {
+                        button.disabled = false;
+                        button.removeAttribute('title');
+                        catalogWarning.hidden = true;
+                        catalogWarning.textContent = '';
+                    }
+                }
             }
 
         } catch (error) {
@@ -53,6 +112,11 @@
     button.addEventListener("click", async () => {
 
         if (button.disabled) {
+            return;
+        }
+        // No browser confirmation popups: approval is collected in the visible page checkbox.
+        if (aliasSuggestions.length && (!variantApprovalCheckbox || !variantApprovalCheckbox.checked)) {
+            showMessage('Confirm the supplier product alternatives in the checkbox before saving.', true);
             return;
         }
 
@@ -72,7 +136,8 @@
                         "Accept": "application/json"
                     },
                     body: JSON.stringify({
-                        rfq_number: rfqNumber
+                        rfq_number: rfqNumber,
+                        confirm_catalog_aliases: aliasSuggestions.length > 0
                     })
                 }
             );

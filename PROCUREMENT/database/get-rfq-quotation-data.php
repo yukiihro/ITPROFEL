@@ -2,6 +2,7 @@
 header('Content-Type: application/json; charset=utf-8');
 if (session_status() !== PHP_SESSION_ACTIVE) require_once __DIR__ . '/uniprocur-session.php';
 require_once __DIR__ . '/procurement_db_connection.php';
+require_once __DIR__ . '/supplier-catalog-match.php';
 function reply(int $code, array $payload): void {
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -56,20 +57,18 @@ try {
         $catalog = $catStmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $supplier['items'] = [];
         foreach ($items as $item) {
-            $matched = null;
-            foreach ($catalog as $entry) {
-                if (mb_strtolower(trim($entry['item_name'])) === mb_strtolower(trim($item['item_name'])) && mb_strtolower(trim($entry['unit'])) === mb_strtolower(trim($item['unit']))) {
-                    $matched = $entry;
-                    break;
-                }
-            }
+            $resolution = uniFindSupplierCatalogMatch($catalog, (string)$item['item_name'], (string)$item['unit']);
+            $matched = $resolution['item'];
             $supplier['items'][] = [
                 'pr_item_id'=>(int)$item['id'],
                 'item_name'=>$item['item_name'],
                 'quantity'=>(float)$item['qty'],
                 'unit'=>$item['unit'],
                 'supplier_item_id'=>$matched ? (int)$matched['id'] : null,
-                'unit_price'=>$matched ? (float)$matched['unit_price'] : null
+                'unit_price'=>$matched ? (float)$matched['unit_price'] : null,
+                'catalog_item_name'=>$matched ? (string)$matched['item_name'] : null,
+                'catalog_match_type'=>$resolution['type'],
+                'catalog_issue'=>$resolution['issue']
             ];
         }
     }

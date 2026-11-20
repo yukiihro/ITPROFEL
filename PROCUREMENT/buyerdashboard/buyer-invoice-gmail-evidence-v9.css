@@ -1,0 +1,10 @@
+/* Scope strictly to the existing discrepancy modal. */
+.disc-modal .disc-gmail-v9{box-sizing:border-box;border:1px solid #b7cde5;background:#eef6ff;border-radius:8px;padding:12px;margin:10px 0 16px;color:#173a60;}
+.disc-modal .disc-gmail-v9 strong{display:block;font-weight:700;margin-bottom:5px;}
+.disc-modal .disc-gmail-v9 p{margin:4px 0 9px;font-size:12px;line-height:1.45;}
+.disc-modal .disc-gmail-v9-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.disc-modal .disc-gmail-v9 select{box-sizing:border-box;min-width:160px;flex:1 1 220px;padding:9px 10px;max-width:100%;border:1px solid #9eb3ce;border-radius:5px;background:white;color:#1f2937;}
+.disc-modal .disc-gmail-v9 button{padding:9px 11px;white-space:nowrap;background:#163e67;color:white;border:0;border-radius:5px;cursor:pointer;}
+.disc-modal .disc-gmail-v9 button:disabled{opacity:.6;cursor:wait;}
+.disc-modal .disc-gmail-v9 a{font-size:12px;color:#064d93;text-decoration:underline;white-space:nowrap;}
+.disc-modal .disc-gmail-v9 .disc-gmail-v9-status{font-size:12px;color:#344860;margin-top:8px;}

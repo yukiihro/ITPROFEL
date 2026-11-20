@@ -1,0 +1,22 @@
+[
+    {
+        "id": "USR-001",
+        "username": "admin",
+        "email": "admin26@gmail.com",
+        "fullName": "Administrator",
+        "role": "Administrator",
+        "phone": "",
+        "password": "$2y$12$9t0ymFBPmjD\/u8jeNLnGteqfkWtsLZaXLlVbW.5lfZZN0gHR0sFCC",
+        "createdAt": "2026-09-18T11:06:00+00:00"
+    },
+    {
+        "id": "USR-002",
+        "username": "jmmendoza@gmail.com",
+        "email": "jmmendoza@gmail.com",
+        "fullName": "Juan Miguel Mendoza",
+        "role": "HR Staff",
+        "phone": "",
+        "password": "$2y$10$DFMr4zMwDPOvt6jY87rc\/eIpRMEvbfl8oghqLHHTtLaENTjttFWwG",
+        "createdAt": "2026-09-27T15:06:15+02:00"
+    }
+]

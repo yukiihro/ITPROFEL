@@ -1,0 +1,13 @@
+# Shared cross-team API key. Inventory's api/ (_bootstrap.php api_auth),
+# Procurement's API callers and Production's inventory-api.php all read this
+# same value, so one place keeps the three teams in sync.
+SetEnv IMS_API_KEY 2e0a029342ae30237f4324524b62ef073dab624b636b9e896229195869fd069d
+
+# Procurement <-> Finance invoice-handoff secret. The code's built-in default
+# path resolves inside htdocs, where the file does not exist; the real token
+# lives outside the web root. Pointed here so both sides load the same file.
+SetEnv UNIPROCUR_FINANCE_TOKEN_FILE C:/xampp/uniprocur_secrets/finance_integration_token.txt
+SetEnv INVENTORY_API_KEY 2e0a029342ae30237f4324524b62ef073dab624b636b9e896229195869fd069d
+SetEnv INVENTORY_API_BASE_URL http://localhost/ITPROFEL/INVENTORY/api
+SetEnv UNIPROCUR_WH_MAIN_DELIVERY_ADDRESS "Main Warehouse - Brgy. II-C, San Pablo City, Laguna"
+SetEnv UNIPROCUR_WH_SECONDARY_DELIVERY_ADDRESS "Second Warehouse - Palina, Nagcarlan, Laguna"

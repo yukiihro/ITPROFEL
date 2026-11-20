@@ -1,0 +1,12 @@
+/* Distinguish user-transcribed Inventory Gmail quantities from authenticated Goods Receipt records. */
+.disc-modal .disc-mail-report{border:1px solid #cfdbf8;border-radius:10px;padding:12px 14px;margin:12px 0;background:#f7faff;min-width:0}
+.disc-modal .disc-mail-report legend{font-weight:700;color:#123d66;padding:0 7px}
+.disc-modal .disc-mail-report .disc-edit-fields{margin:8px 0;}
+.disc-modal .disc-mail-report label{font-size:13px}
+.disc-modal .disc-mail-report input:not([type="checkbox"]),.disc-modal .disc-mail-report textarea{max-width:100%;min-width:0;box-sizing:border-box}
+.disc-modal .disc-mail-report button{padding:10px 15px;border:1px solid #295c86;background:#225581;color:white;border-radius:8px;cursor:pointer;font-weight:600}
+.disc-modal .disc-mail-report button:disabled{opacity:.6}
+.disc-modal .disc-mail-wide{grid-column:1/-1}
+.disc-modal .disc-edit-table{min-width:980px}
+.disc-modal .disc-edit-table td input{min-width:80px;width:100px}
+.disc-modal .disc-edit-table-wrap{overflow-x:auto}

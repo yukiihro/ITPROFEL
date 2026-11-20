@@ -1,0 +1,20 @@
+<IfModule mod_headers.c>
+<FilesMatch "\.(html|js|css|php)$">
+Header set Cache-Control "no-cache, no-store, must-revalidate"
+Header set Pragma "no-cache"
+Header set Expires "0"
+</FilesMatch>
+Header set X-Content-Type-Options "nosniff"
+Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+Options -Indexes
+
+<IfModule mod_authz_core.c>
+<FilesMatch "^(database|helpers|inventory-api|config\.sample|config\.local)\.php$">
+Require all denied
+</FilesMatch>
+<FilesMatch "\.(sql|md|txt|log|bak)$">
+Require all denied
+</FilesMatch>
+</IfModule>

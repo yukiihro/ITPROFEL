@@ -1,0 +1,68 @@
+Sales / Inventory API integration
+=================================
+
+Sales reads the finished-goods catalog and submits/refreshes Sales stock
+requests through the Inventory System JSON API. Sales stock remains in the
+Sales database; an Inventory stock-out is imported only once by its Inventory
+stock-out ID.
+
+Required Sales environment variables:
+
+  INVENTORY_API_BASE_URL=http://localhost/Inventory_System/api
+  INVENTORY_API_KEY=<shared Sales-to-Inventory API key>
+
+Generate a new random secret for this integration and store it outside source
+control. A key shared in chat or committed to a file must be considered exposed
+and rotated. Do not use the example placeholder above as a key.
+
+For Apache, set these values in the relevant VirtualHost or Directory
+configuration, then restart Apache. Example (replace the base URL for your
+deployment and generate a private key):
+
+  SetEnv INVENTORY_API_BASE_URL "http://localhost/Inventory_System/api"
+  SetEnv INVENTORY_API_KEY "<new-random-secret>"
+
+Configure the Sales Apache scope's INVENTORY_API_KEY to match the existing
+$IMS_API_KEY value in Inventory api/config.php. Inventory's API configuration
+does not need to be changed. The Sales API client sends the key in the
+X-API-Key header and identifies itself with X-API-Team: Sales. Use HTTPS when
+Sales and Inventory are on different hosts; do not send this secret over
+public plain HTTP.
+
+PHP requirements:
+
+  - PHP cURL extension enabled
+  - Access from the Sales web server to the Inventory API URL
+
+Sales API usage:
+
+  GET  items.php     Read active item IDs, codes, names, types, sizes, units,
+                     and active warehouses. The current API does not expose
+                     brand, price, or stock quantities. Use Sales-owned data
+                     for sellable stock and pricing.
+  POST requests.php  Submit a Sales stock request for Inventory approval.
+  GET  requests.php  Read Sales-destination request status and approved
+                     quantities. The POST response contains a request
+                     number; Sales resolves the Inventory request ID with
+                     this GET endpoint.
+  POST sales-returns.php
+                     Submit approved returns as an items array with finished-
+                     good identity, quantity, damage description, and JPG,
+                     PNG, or WebP evidence (maximum 5 MB per item).
+
+Inventory remains responsible for approving requests and creating stock-outs.
+After Inventory marks a Sales delivery as Out for Delivery, Sales Admin reviews
+it in Inventory Delivery Approval. Sales imports the approved quantity into
+Sales inventory only after Sales confirms receipt through the Inventory API,
+which also creates the Inventory Delivery Receipt. Sales does not write to
+Inventory's database or change Inventory stock directly. Request quantities
+must be positive whole numbers. Purchase Orders convert to Sales Orders after
+validating that the product is active; Sales stock sufficiency is handled
+during Sales Order approval.
+
+For an existing Sales database that was not created from the updated schema,
+apply database/migrations/20261110_add_user_notifications.sql to enable Sales
+Admin approval notifications. Apply database/migrations/20261113_add_inventory_delivery_approvals.sql
+to enable the Sales Admin Inventory Delivery Approval queue.
+Apply database/migrations/20261115_add_sales_return_damage_evidence.sql
+to store return photos before enabling Sales or Customer return submissions.

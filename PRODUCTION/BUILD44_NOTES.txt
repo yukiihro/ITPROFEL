@@ -1,0 +1,4 @@
+Build 44 - Inventory Delivery Progress empty (production only)
+
+New: php/inventory-delivery-fix.php (supervisor only). Checks Inventory's deliveries.receipt_confirmed_at and, on button press, adds it.
+No Inventory file is changed and no existing data is touched. See INVENTORY_SIDE_NOTES.txt item 5.

@@ -1,0 +1,9 @@
+Build 43 - Approve = Delivered (production only; Inventory not changed)
+
+When production approves an Inventory product request (Material issuance -> Product requests -> Approve):
+- the production order is created and the request is approved in Inventory (as before), and
+- the full approved quantity is ALSO reported to Inventory as delivered (POST deliveries.php), without waiting for production to finish.
+- The order is flagged production_orders.delivered_on_approval=1 (column added automatically), so Finished goods -> Send does not deliver the same units again; finished units stay in production stock.
+- If Inventory refuses the delivery report, the request stays Approved, a warning is shown/notified, and delivered_on_approval stays 0 (Finished goods -> Send still works as before).
+Files: php/helpers.php, php/product-requests.php, php/finished-goods.php.
+Note: Inventory still records "accepted" itself in Delivery Progress; production cannot do that through the API.

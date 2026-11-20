@@ -1,0 +1,7 @@
+/* Final verification after a resolved discrepancy. No backend controls bypassed. */
+.disc-modal.disc-final-verify-v13 #discResolveForm > h2 {font-size:14px}
+.disc-modal.disc-final-verify-v13 #discResolveForm > #discResolveIntro {display:none}
+.disc-modal.disc-final-verify-v13 #discMailPanel #discSaveEmail {display:none!important}
+.disc-modal.disc-final-verify-v13 #discMailPanel #discMailChecked {pointer-events:none}
+.disc-modal.disc-final-verify-v13 #discSingleFinal {display:none!important}
+.disc-modal.disc-final-verify-v13 #discEditSave {background:#831b1b}

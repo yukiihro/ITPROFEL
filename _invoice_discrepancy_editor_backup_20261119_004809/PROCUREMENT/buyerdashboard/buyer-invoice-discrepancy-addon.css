@@ -1,0 +1,27 @@
+.disc-inline-note{background:#fff3ed;color:#812e14;border:1px solid #eab596;border-radius:7px;padding:13px 17px;margin:12px 0;font-size:13px;line-height:1.5}
+.disc-resolve-trigger{border:1px solid #a74435;background:#fff;color:#8a241e;border-radius:8px;padding:10px 15px;margin:8px 0 16px;font:600 13px Inter,Arial,sans-serif;cursor:pointer}
+.disc-modal{border:0;border-radius:12px;width:min(900px,calc(100vw - 26px));max-height:calc(100vh - 38px);overflow:auto;padding:26px;background:#fff;color:#171717;box-shadow:0 30px 70px #0006;font:14px Inter,Arial,sans-serif}
+.disc-modal::backdrop{background:#0009}
+.disc-modal .disc-head{display:flex;justify-content:space-between;align-items:start;border-bottom:1px solid #ddd;padding-bottom:15px}
+.disc-modal .disc-head small{color:#555;font-size:12px}
+.disc-modal h2{font-size:21px;margin:4px 0 6px}
+.disc-modal .disc-head p{margin:0;color:#666;font-size:13px}
+.disc-modal .disc-close{border:0;background:none;font-size:25px;cursor:pointer;padding:0 8px}
+.disc-modal .disc-description{color:#444;font-size:13px;line-height:1.6}
+.disc-modal .disc-evidence{background:#f8f8f8;border:1px solid #e5e5e5;border-radius:8px;padding:12px;margin:12px 0;max-height:180px;overflow:auto}
+.disc-modal .disc-evidence p{font-size:12px;margin:7px 0}
+.disc-modal .disc-columns{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:18px}
+.disc-modal fieldset{border:1px solid #ccc;border-radius:8px;padding:17px 16px;min-width:0}
+.disc-modal legend{font-weight:700;padding:0 5px;font-size:14px}
+.disc-modal fieldset label{display:flex;gap:10px;align-items:center;margin:12px 0;font-size:13px}
+.disc-modal input[type="checkbox"]{width:17px;height:17px;accent-color:#991b1b}
+.disc-modal .disc-fields label,.disc-modal #discResolveForm label{display:block;margin:11px 0 6px;font-weight:700;font-size:13px}
+.disc-modal textarea,.disc-modal input[type="text"]{display:block;box-sizing:border-box;width:100%;padding:12px;border:1px solid #bbb;border-radius:7px;font:13px Inter,Arial,sans-serif;resize:vertical;background:#fff;color:#171717}
+.disc-modal .disc-fields label span{color:#a11}
+.disc-modal .disc-feedback{color:#a11;font-size:13px;min-height:20px}
+.disc-modal .disc-actions{display:flex;gap:12px;justify-content:end;margin-top:15px}
+.disc-modal .disc-actions button{padding:11px 17px;border-radius:8px;border:1px solid #333;background:#fff;color:#171717;font:600 13px Inter,Arial,sans-serif;cursor:pointer}
+.disc-modal .disc-actions button[type="submit"]{background:#161616;color:white}
+.disc-modal button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:700px){.disc-modal{padding:16px}.disc-modal .disc-columns{grid-template-columns:1fr;gap:10px}.disc-modal .disc-actions{flex-wrap:wrap}}
+@media print {.disc-modal,.disc-inline-note,.disc-resolve-trigger{display:none!important}}
